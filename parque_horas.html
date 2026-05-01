@@ -336,6 +336,13 @@
       <button class="tab" id="tabRej" onclick="mudarTab('rejeitado')">Rejeitados</button>
       <button class="tab" id="tabMon" onclick="mudarTab('monitores')">Gerir colaboradores</button>
     </div>
+    <div id="parqueFiltroSection" style="display:none;margin-bottom:1rem;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="tab-btn ativo" id="filtroTodos" onclick="mudarFiltroParque('todos')">Todos</button>
+        <button class="tab-btn" id="filtroColorParty" onclick="mudarFiltroParque('Color Party')">Color Party</button>
+        <button class="tab-btn" id="filtroYupiColor" onclick="mudarFiltroParque('Yupi Color')">Yupi Color</button>
+      </div>
+    </div>
     <div class="card" style="padding: 0 1.25rem;">
       <div id="conteudoTab"><div class="loading">A carregar...</div></div>
     </div>
@@ -379,6 +386,7 @@ let pinAtual = '';
 let monitorAtual = null;
 let gestorTipo = 'monitores'; // 'monitores' ou 'interno'
 let tabAtiva = 'pendente';
+let filtroParque = 'todos';
 let registosCache = [];
 let monitoresCache = [];
 let modalId = null;
@@ -623,6 +631,10 @@ async function iniciarGestor() {
   // Show PDF button for both teams
   const btnPDF = document.getElementById('btnGerarPDF');
   if (btnPDF) btnPDF.style.display = 'inline-block';
+  // Show parque filter only for monitores
+  const pfs = document.getElementById('parqueFiltroSection');
+  if (pfs) pfs.style.display = gestorTipo === 'monitores' ? 'block' : 'none';
+  filtroParque = 'todos';
   const ano = new Date().getFullYear();
   const sm = document.getElementById('gMes'), sa = document.getElementById('gAno');
   sm.innerHTML = MESES.map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
@@ -675,7 +687,8 @@ function atualizarTabs() {
 function renderTab() {
   const el = document.getElementById('conteudoTab'); el.innerHTML='';
   if (tabAtiva==='monitores') { renderMonitores(el); return; }
-  const regs = registosCache.filter(r=>r.estado===tabAtiva);
+  let regs = registosCache.filter(r=>r.estado===tabAtiva);
+  if (gestorTipo==='monitores' && filtroParque !== 'todos') regs = regs.filter(r=>r.parque===filtroParque);
   if (!regs.length) { el.innerHTML=`<div class="empty">Sem registos ${tabAtiva==='pendente'?'pendentes':tabAtiva==='aprovado'?'aprovados':'rejeitados'} neste período.</div>`; return; }
   const wrap = document.createElement('div'); wrap.className='table-wrap';
   const t = document.createElement('table');
