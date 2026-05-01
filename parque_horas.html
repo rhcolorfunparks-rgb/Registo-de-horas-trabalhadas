@@ -338,6 +338,13 @@
       <div class="field"><label>Entrada</label><input type="time" id="modalEntrada"></div>
       <div class="field"><label>Saída</label><input type="time" id="modalSaida"></div>
     </div>
+    <div id="modalPausaRow" style="display:none;">
+      <div class="field-row">
+        <div class="field"><label>Início pausa</label><input type="time" id="modalPausaInicio"></div>
+        <div class="field"><label>Fim pausa</label><input type="time" id="modalPausaFim"></div>
+      </div>
+      <div class="field"><label>Observações</label><input type="text" id="modalObs" placeholder="Ex: Feriado trabalhado, Formação..."></div>
+    </div>
     <div class="modal-preview" id="modalPreview"></div>
     <div class="modal-acoes">
       <button class="btn-confirmar" onclick="confirmarEdicao()">Aprovar</button>
@@ -731,8 +738,28 @@ function abrirModal(id) {
   document.getElementById('modalEntrada').value=r.entrada;
   document.getElementById('modalSaida').value=r.saida||'';
   document.getElementById('modalErro').textContent='';
-  const upd=()=>{const e=document.getElementById('modalEntrada').value,s=document.getElementById('modalSaida').value;document.getElementById('modalPreview').textContent=e&&s&&calcMin(e,s)>0?`Total: ${minStr(calcMin(e,s))}`:(e&&s?'Saída deve ser após entrada.':'');};
-  document.getElementById('modalEntrada').oninput=upd; document.getElementById('modalSaida').oninput=upd; upd();
+  // Show pausa fields for equipa interna
+  const pausaRow = document.getElementById('modalPausaRow');
+  if (pausaRow) {
+    pausaRow.style.display = gestorTipo === 'interno' ? 'block' : 'none';
+    if (gestorTipo === 'interno') {
+      document.getElementById('modalPausaInicio').value = r.pausa_inicio||'';
+      document.getElementById('modalPausaFim').value = r.pausa_fim||'';
+      document.getElementById('modalObs').value = r.observacoes||'';
+    }
+  }
+  const upd=()=>{
+    const e=document.getElementById('modalEntrada').value,s=document.getElementById('modalSaida').value;
+    const pi=document.getElementById('modalPausaInicio')?document.getElementById('modalPausaInicio').value:'';
+    const pf=document.getElementById('modalPausaFim')?document.getElementById('modalPausaFim').value:'';
+    const bruto=e&&s&&calcMin(e,s)>0?calcMin(e,s):0;
+    const pausaMin=pi&&pf?calcMin(pi,pf):0;
+    const liq=Math.max(bruto-pausaMin,0);
+    document.getElementById('modalPreview').textContent=e&&s&&bruto>0?(gestorTipo==='interno'&&pi&&pf?`Total: ${minStr(bruto)} − Pausa: ${minStr(pausaMin)} = ${minStr(liq)} efetivas`:`Total: ${minStr(bruto)}`):(e&&s?'Saída deve ser após entrada.':'');
+  };
+  document.getElementById('modalEntrada').oninput=upd; document.getElementById('modalSaida').oninput=upd;
+  if(document.getElementById('modalPausaInicio')) { document.getElementById('modalPausaInicio').oninput=upd; document.getElementById('modalPausaFim').oninput=upd; }
+  upd();
   document.getElementById('modalOverlay').classList.add('aberto');
 }
 function fecharModal(){document.getElementById('modalOverlay').classList.remove('aberto');}
@@ -741,7 +768,13 @@ async function confirmarEdicao() {
   const err=document.getElementById('modalErro');
   if(!data||!ent||!sai) return err.textContent='Preencha todos os campos.';
   if(calcMin(ent,sai)<=0) return err.textContent='Saída deve ser após entrada.';
-  try { await db(`registos?id=eq.${modalId}`,{method:'PATCH',body:{data,entrada:ent,saida:sai,estado:'aprovado'},prefer:'return=minimal',headers:{}}); fecharModal(); await carregarGestor(); }
+  const body = {data,entrada:ent,saida:sai,estado:'aprovado'};
+  if(gestorTipo==='interno') {
+    body.pausa_inicio = document.getElementById('modalPausaInicio').value||null;
+    body.pausa_fim = document.getElementById('modalPausaFim').value||null;
+    body.observacoes = document.getElementById('modalObs').value.trim()||null;
+  }
+  try { await db(`registos?id=eq.${modalId}`,{method:'PATCH',body,prefer:'return=minimal',headers:{}}); fecharModal(); await carregarGestor(); }
   catch(e){err.textContent='Erro ao guardar.';}
 }
 
