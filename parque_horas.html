@@ -776,7 +776,7 @@ function abrirModal(id) {
     const bruto=e&&s&&calcMin(e,s)>0?calcMin(e,s):0;
     const pausaMin=pi&&pf?calcMin(pi,pf):0;
     const liq=Math.max(bruto-pausaMin,0);
-    document.getElementById('modalPreview').textContent=e&&s&&bruto>0?(gestorTipo==='interno'&&pi&&pf?`Total: ${minStr(bruto)} − Pausa: ${minStr(pausaMin)} = ${minStr(liq)} efetivas`:`Total: ${minStr(bruto)}`):(e&&s?'Saída deve ser após entrada.':'');
+    document.getElementById('modalPreview').textContent=e&&s&&bruto>0?(pi&&pf?`Total: ${minStr(bruto)} − Pausa: ${minStr(pausaMin)} = ${minStr(liq)} efetivas`:`Total: ${minStr(bruto)}`):(e&&s?'Saída deve ser após entrada.':'');
   };
   document.getElementById('modalEntrada').oninput=upd; document.getElementById('modalSaida').oninput=upd;
   if(document.getElementById('modalPausaInicio')) { document.getElementById('modalPausaInicio').oninput=upd; document.getElementById('modalPausaFim').oninput=upd; }
