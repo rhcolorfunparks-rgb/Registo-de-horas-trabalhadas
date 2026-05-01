@@ -679,6 +679,17 @@ function renderStats() {
   });
 }
 function mudarTab(t) { tabAtiva=t; atualizarTabs(); renderTab(); }
+function mudarFiltroParque(p) {
+  filtroParque = p;
+  ['filtroTodos','filtroColorParty','filtroYupiColor'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.className = 'tab';
+  });
+  const idMap = {'todos':'filtroTodos','Color Party':'filtroColorParty','Yupi Color':'filtroYupiColor'};
+  const activeEl = document.getElementById(idMap[p]);
+  if (activeEl) activeEl.className = 'tab ativo';
+  renderTab();
+}
 function atualizarTabs() {
   [['tabPend','pendente'],['tabApr','aprovado'],['tabRej','rejeitado'],['tabMon','monitores']].forEach(([id,v])=>{
     document.getElementById(id).className = 'tab'+(tabAtiva===v?' ativo':'');
