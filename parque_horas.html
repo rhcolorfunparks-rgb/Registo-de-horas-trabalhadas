@@ -251,6 +251,20 @@
           <input type="text" id="mObs" placeholder="Ex: Feriado trabalhado, Formação, Horas extra, Motivo de saída mais tarde..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
         </div>
       </div>
+      <!-- Pausa (monitores) -->
+      <div id="pausaMonitorSection" style="margin-bottom:10px;display:none;">
+        <label style="display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:4px;">Pausa (opcional)</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:3px;">Início da pausa</label>
+            <input type="time" id="mPausaInicioMonitor" style="width:100%;font-size:14px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:3px;">Fim da pausa</label>
+            <input type="time" id="mPausaFimMonitor" style="width:100%;font-size:14px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
+          </div>
+        </div>
+      </div>
       <!-- Função (só monitores) -->
       <div style="margin-bottom:12px;" id="funcaoSection">
         <label style="display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:8px;">Função exercida</label>
@@ -450,6 +464,8 @@ async function iniciarMonitor() {
   if (fs) fs.style.display = isInterno ? 'none' : 'block';
   const ps = document.getElementById('parqueSection');
   if (ps) ps.style.display = isInterno ? 'none' : 'block';
+  const pms = document.getElementById('pausaMonitorSection');
+  if (pms) pms.style.display = isInterno ? 'none' : 'block';
   // Interno-only sections
   const tipoDia = document.getElementById('tipoDiaSection');
   if (tipoDia) tipoDia.style.display = isInterno ? 'block' : 'none';
@@ -471,21 +487,20 @@ async function iniciarMonitor() {
   const upd = () => {
     const ent = document.getElementById('mEntrada').value;
     const sai = document.getElementById('mSaida').value;
-    const pi = document.getElementById('mPausaInicio') ? document.getElementById('mPausaInicio').value : '';
-    const pf = document.getElementById('mPausaFim') ? document.getElementById('mPausaFim').value : '';
+    const pi = isInterno ? (document.getElementById('mPausaInicio') ? document.getElementById('mPausaInicio').value : '') : (document.getElementById('mPausaInicioMonitor') ? document.getElementById('mPausaInicioMonitor').value : '');
+    const pf = isInterno ? (document.getElementById('mPausaFim') ? document.getElementById('mPausaFim').value : '') : (document.getElementById('mPausaFimMonitor') ? document.getElementById('mPausaFimMonitor').value : '');
     if (ent && sai) {
       let total = calcMin(ent, sai);
-      let pausaMin = 0;
-      if (isInterno && pi && pf) pausaMin = calcMin(pi, pf);
-      const liquido = total - pausaMin;
-      if (liquido > 0) {
-        document.getElementById('mPreview').textContent = isInterno && pi && pf
+      let pausaMin = pi && pf ? calcMin(pi, pf) : 0;
+      const liquido = Math.max(total - pausaMin, 0);
+      if (total > 0) {
+        document.getElementById('mPreview').textContent = pi && pf
           ? `Total: ${minStr(total)} − Pausa: ${minStr(pausaMin)} = ${minStr(liquido)} efetivas`
           : `Total: ${minStr(total)}`;
       }
     }
   };
-  ['mEntrada','mSaida','mPausaInicio','mPausaFim'].forEach(id => {
+  ['mEntrada','mSaida','mPausaInicio','mPausaFim','mPausaInicioMonitor','mPausaFimMonitor'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.oninput = upd;
   });
@@ -553,8 +568,12 @@ async function submeterRegisto() {
     if (!isInterno && !parqueEl) return err.textContent = 'Selecione o parque.';
     const funcao = isInterno ? null : funcaoEl ? funcaoEl.value : null;
     const parque = isInterno ? null : parqueEl ? parqueEl.value : null;
-    const pausaInicio = isInterno && document.getElementById('mPausaInicio') ? document.getElementById('mPausaInicio').value || null : null;
-    const pausaFim = isInterno && document.getElementById('mPausaFim') ? document.getElementById('mPausaFim').value || null : null;
+    const pausaInicio = isInterno
+      ? (document.getElementById('mPausaInicio') ? document.getElementById('mPausaInicio').value || null : null)
+      : (document.getElementById('mPausaInicioMonitor') ? document.getElementById('mPausaInicioMonitor').value || null : null);
+    const pausaFim = isInterno
+      ? (document.getElementById('mPausaFim') ? document.getElementById('mPausaFim').value || null : null)
+      : (document.getElementById('mPausaFimMonitor') ? document.getElementById('mPausaFimMonitor').value || null : null);
     const obs = isInterno && document.getElementById('mObs') ? document.getElementById('mObs').value.trim() || null : null;
     try {
       await db('registos', {method:'POST', body:{monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, data, entrada:ent, saida:sai, pausa_inicio:pausaInicio, pausa_fim:pausaFim, observacoes:obs, funcao, parque, equipa, tipo_dia:'normal', estado:'pendente'}});
@@ -563,6 +582,8 @@ async function submeterRegisto() {
       document.getElementById('mSaida').value = '';
       if (document.getElementById('mPausaInicio')) document.getElementById('mPausaInicio').value = '';
       if (document.getElementById('mPausaFim')) document.getElementById('mPausaFim').value = '';
+      if (document.getElementById('mPausaInicioMonitor')) document.getElementById('mPausaInicioMonitor').value = '';
+      if (document.getElementById('mPausaFimMonitor')) document.getElementById('mPausaFimMonitor').value = '';
       if (document.getElementById('mObs')) document.getElementById('mObs').value = '';
       if (funcaoEl) funcaoEl.checked = false;
       const parqueChecked = document.querySelector('input[name="mParque"]:checked');
@@ -741,10 +762,10 @@ function abrirModal(id) {
   // Show pausa fields for equipa interna
   const pausaRow = document.getElementById('modalPausaRow');
   if (pausaRow) {
-    pausaRow.style.display = gestorTipo === 'interno' ? 'block' : 'none';
+    pausaRow.style.display = 'block';
+    document.getElementById('modalPausaInicio').value = r.pausa_inicio||'';
+    document.getElementById('modalPausaFim').value = r.pausa_fim||'';
     if (gestorTipo === 'interno') {
-      document.getElementById('modalPausaInicio').value = r.pausa_inicio||'';
-      document.getElementById('modalPausaFim').value = r.pausa_fim||'';
       document.getElementById('modalObs').value = r.observacoes||'';
     }
   }
@@ -769,9 +790,9 @@ async function confirmarEdicao() {
   if(!data||!ent||!sai) return err.textContent='Preencha todos os campos.';
   if(calcMin(ent,sai)<=0) return err.textContent='Saída deve ser após entrada.';
   const body = {data,entrada:ent,saida:sai,estado:'aprovado'};
+  body.pausa_inicio = document.getElementById('modalPausaInicio').value||null;
+  body.pausa_fim = document.getElementById('modalPausaFim').value||null;
   if(gestorTipo==='interno') {
-    body.pausa_inicio = document.getElementById('modalPausaInicio').value||null;
-    body.pausa_fim = document.getElementById('modalPausaFim').value||null;
     body.observacoes = document.getElementById('modalObs').value.trim()||null;
   }
   try { await db(`registos?id=eq.${modalId}`,{method:'PATCH',body,prefer:'return=minimal',headers:{}}); fecharModal(); await carregarGestor(); }
