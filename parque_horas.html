@@ -333,6 +333,9 @@
       <select id="gMes"></select>
       <select id="gAno"></select>
       <button onclick="exportarCSV()">Exportar CSV</button>
+      <select id="selMonitorPDF" style="display:none;font-size:13px;padding:7px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;">
+        <option value="todos">Todos os colaboradores</option>
+      </select>
       <button id="btnGerarPDF" onclick="gerarFolhasPontoPDF()" style="display:none;">Gerar folhas PDF</button>
     </div>
     <div class="tabs">
@@ -655,9 +658,11 @@ async function iniciarGestor() {
   if (sf) sf.style.display = gestorTipo === 'interno' ? 'none' : 'grid';
   // Update tab label
   document.getElementById('tabMon').textContent = gestorTipo === 'interno' ? 'Gerir colaboradores' : 'Gerir monitores';
-  // Show PDF button for both teams
+  // Show PDF button and selector for both teams
   const btnPDF = document.getElementById('btnGerarPDF');
   if (btnPDF) btnPDF.style.display = 'inline-block';
+  const selPDF = document.getElementById('selMonitorPDF');
+  if (selPDF) selPDF.style.display = 'inline-block';
   // Show parque filter only for monitores
   const pfs = document.getElementById('parqueFiltroSection');
   if (pfs) pfs.style.display = gestorTipo === 'monitores' ? 'block' : 'none';
@@ -684,7 +689,7 @@ async function carregarGestor() {
     const equipaQ = gestorTipo === 'interno' ? 'equipa=eq.interno' : 'or=(equipa.is.null,equipa.eq.monitores)';
     registosCache = await db(`registos?data=gte.${dataInicio}&data=lt.${dataFim}&${equipaQ}&order=monitor_nome.asc,data.asc`) || [];
     monitoresCache = await db(`monitores?equipa=eq.${gestorTipo}&order=nome.asc`) || [];
-    renderStats(); renderTab();
+    renderStats(); renderTab(); popularSelectorPDF();
   } catch(e) {
     console.error('Erro carregarGestor:', e);
     document.getElementById('conteudoTab').innerHTML = '<div class="loading">Erro ao carregar dados.</div>';
@@ -890,16 +895,43 @@ function exportarCSV() {
   a.download=`horas_${MESES[parseInt(mes)-1]}_${ano}.csv`;a.click();
 }
 
+function popularSelectorPDF() {
+  const sel = document.getElementById('selMonitorPDF');
+  if (!sel) return;
+  const nomes = [...new Set(registosCache.map(r=>r.monitor_nome))].sort();
+  sel.innerHTML = '<option value="todos">Todos os colaboradores</option>';
+  nomes.forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n; opt.textContent = n;
+    sel.appendChild(opt);
+  });
+  // Also add all monitores from cache
+  monitoresCache.forEach(m => {
+    if (!nomes.includes(m.nome)) {
+      const opt = document.createElement('option');
+      opt.value = m.nome; opt.textContent = m.nome;
+      sel.appendChild(opt);
+    }
+  });
+}
+
 function gerarFolhasPontoPDF() {
   const mes = parseInt(document.getElementById('gMes').value);
   const ano = parseInt(document.getElementById('gAno').value);
   const nomeMes = MESES[mes-1];
   const isInterno = gestorTipo === 'interno';
+  const selPDF = document.getElementById('selMonitorPDF');
+  const monitorSelecionado = selPDF ? selPDF.value : 'todos';
   const porColab = {};
-  registosCache.forEach(r => {
+  const registosFiltrados = monitorSelecionado === 'todos' ? registosCache : registosCache.filter(r=>r.monitor_nome===monitorSelecionado);
+  registosFiltrados.forEach(r => {
     if (!porColab[r.monitor_nome]) porColab[r.monitor_nome] = [];
     porColab[r.monitor_nome].push(r);
   });
+  // If specific monitor selected but no records, still generate empty sheet
+  if (monitorSelecionado !== 'todos' && !porColab[monitorSelecionado]) {
+    porColab[monitorSelecionado] = [];
+  }
   if (!Object.keys(porColab).length) { alert('Sem registos para gerar folhas.'); return; }
   let html = `<!DOCTYPE html><html lang="pt"><head><meta charset="UTF-8"><title>Folhas de Ponto</title><style>
     *{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:11px;color:#111;}
