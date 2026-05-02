@@ -701,6 +701,26 @@ function renderTab() {
   let regs = registosCache.filter(r=>r.estado===tabAtiva);
   if (gestorTipo==='monitores' && filtroParque !== 'todos') regs = regs.filter(r=>r.parque===filtroParque);
   if (!regs.length) { el.innerHTML=`<div class="empty">Sem registos ${tabAtiva==='pendente'?'pendentes':tabAtiva==='aprovado'?'aprovados':'rejeitados'} neste período.</div>`; return; }
+  // Calculate weekly hours per collaborator for equipa interna warning
+  const horasSemanais = {};
+  if (gestorTipo === 'interno') {
+    registosCache.filter(r=>r.saida&&r.entrada).forEach(r => {
+      const d = new Date(r.data);
+      const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
+      const startOfWeek = new Date(d);
+      startOfWeek.setDate(d.getDate() - dow);
+      const weekKey = `${r.monitor_nome}_${startOfWeek.toISOString().split('T')[0]}`;
+      const bruto = calcMin(r.entrada, r.saida);
+      const pausa = r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio, r.pausa_fim) : 0;
+      const liq = Math.max(bruto - pausa, 0);
+      if (!horasSemanais[r.monitor_nome]) horasSemanais[r.monitor_nome] = {};
+      horasSemanais[r.monitor_nome][weekKey] = (horasSemanais[r.monitor_nome][weekKey] || 0) + liq;
+    });
+  }
+  function temSemana40h(nome) {
+    if (!horasSemanais[nome]) return false;
+    return Object.values(horasSemanais[nome]).some(min => min > 40 * 60);
+  }
   const wrap = document.createElement('div'); wrap.className='table-wrap';
   const t = document.createElement('table');
   t.innerHTML=`<thead><tr><th>Monitor</th><th>Data</th><th>Função</th><th>Entrada</th><th>Saída</th><th>Total</th><th>Ações</th></tr></thead>`;
@@ -718,7 +738,8 @@ function renderTab() {
     const tipoDiaLabel = r.tipo_dia && r.tipo_dia !== 'normal' ? ` <span class="badge badge-pend">${r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1)}</span>` : '';
     const pausaLabel = r.pausa_inicio && r.pausa_fim ? `<br><span style="font-size:11px;color:var(--muted);">Pausa: ${r.pausa_inicio}–${r.pausa_fim}</span>` : '';
     const obsLabel = r.observacoes ? `<br><span style="font-size:11px;color:var(--muted);">📝 ${r.observacoes}</span>` : '';
-    tr.innerHTML=`<td><strong>${r.monitor_nome}</strong></td><td>${fmtData(r.data)}${tipoDiaLabel}</td><td><span style="font-size:12px;font-weight:600;background:var(--bg);padding:2px 8px;border-radius:20px;">${r.funcao||'—'}</span>${parqueLabel}</td><td>${r.entrada||'—'}${pausaLabel}</td><td>${r.saida||'—'}</td><td><strong>${h}</strong>${obsLabel}</td><td><div class="acoes">${ac}</div></td>`;
+    const aviso40h = gestorTipo==='interno' && temSemana40h(r.monitor_nome) ? ' <span title="Ultrapassa 40h semanais!" style="font-size:13px;">⚠️</span>' : '';
+    tr.innerHTML=`<td><strong>${r.monitor_nome}</strong>${aviso40h}</td><td>${fmtData(r.data)}${tipoDiaLabel}</td><td><span style="font-size:12px;font-weight:600;background:var(--bg);padding:2px 8px;border-radius:20px;">${r.funcao||'—'}</span>${parqueLabel}</td><td>${r.entrada||'—'}${pausaLabel}</td><td>${r.saida||'—'}</td><td><strong>${h}</strong>${obsLabel}</td><td><div class="acoes">${ac}</div></td>`;
     tb.appendChild(tr);
   });
   t.appendChild(tb); wrap.appendChild(t); el.appendChild(wrap);
