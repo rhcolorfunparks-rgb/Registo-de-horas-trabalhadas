@@ -923,7 +923,7 @@ function gerarFolhasPontoPDF() {
   const selPDF = document.getElementById('selMonitorPDF');
   const monitorSelecionado = selPDF ? selPDF.value : 'todos';
   const porColab = {};
-  const registosFiltrados = monitorSelecionado === 'todos' ? registosCache : registosCache.filter(r=>r.monitor_nome===monitorSelecionado);
+  const registosFiltrados = (monitorSelecionado === 'todos' ? registosCache : registosCache.filter(r=>r.monitor_nome===monitorSelecionado)).filter(r=>r.estado==='aprovado');
   registosFiltrados.forEach(r => {
     if (!porColab[r.monitor_nome]) porColab[r.monitor_nome] = [];
     porColab[r.monitor_nome].push(r);
