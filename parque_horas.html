@@ -292,6 +292,11 @@
           </label>
         </div>
       </div>
+      <!-- Observações (monitores) -->
+      <div id="obsMonitorSection" style="display:none;margin-bottom:10px;">
+        <label style="display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:4px;">Observações</label>
+        <input type="text" id="mObsMonitor" placeholder="Ex: Atraso, prolongamento de hora, substituição..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
+      </div>
       <div id="mPreview" style="font-size:13px;color:var(--muted);margin-bottom:12px;min-height:18px;font-weight:500;"></div>
       <button onclick="submeterRegisto()" style="width:100%;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Submeter registo</button>
     </div>
@@ -364,7 +369,24 @@
         <div class="field"><label>Início pausa</label><input type="time" id="modalPausaInicio"></div>
         <div class="field"><label>Fim pausa</label><input type="time" id="modalPausaFim"></div>
       </div>
-      <div class="field"><label>Observações</label><input type="text" id="modalObs" placeholder="Ex: Feriado trabalhado, Formação..."></div>
+      <div class="field"><label>Observações</label><input type="text" id="modalObs" placeholder="Ex: Feriado trabalhado, Formação, Atraso..."></div>
+    </div>
+    <div id="modalFuncaoRow" style="display:none;margin-bottom:12px;">
+      <div class="field">
+        <label>Função exercida</label>
+        <select id="modalFuncao" style="width:100%;font-size:14px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);">
+          <option value="Monitor">Monitor</option>
+          <option value="Mentor">Mentor</option>
+          <option value="Coordenador">Coordenador</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Parque</label>
+        <select id="modalParque" style="width:100%;font-size:14px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);">
+          <option value="Color Party">Color Party</option>
+          <option value="Yupi Color">Yupi Color</option>
+        </select>
+      </div>
     </div>
     <div class="modal-preview" id="modalPreview"></div>
     <div class="modal-acoes">
@@ -474,6 +496,8 @@ async function iniciarMonitor() {
   if (ps) ps.style.display = isInterno ? 'none' : 'block';
   const pms = document.getElementById('pausaMonitorSection');
   if (pms) pms.style.display = isInterno ? 'none' : 'block';
+  const oms = document.getElementById('obsMonitorSection');
+  if (oms) oms.style.display = isInterno ? 'none' : 'block';
   // Interno-only sections
   const tipoDia = document.getElementById('tipoDiaSection');
   if (tipoDia) tipoDia.style.display = isInterno ? 'block' : 'none';
@@ -582,7 +606,9 @@ async function submeterRegisto() {
     const pausaFim = isInterno
       ? (document.getElementById('mPausaFim') ? document.getElementById('mPausaFim').value || null : null)
       : (document.getElementById('mPausaFimMonitor') ? document.getElementById('mPausaFimMonitor').value || null : null);
-    const obs = isInterno && document.getElementById('mObs') ? document.getElementById('mObs').value.trim() || null : null;
+    const obs = isInterno
+      ? (document.getElementById('mObs') ? document.getElementById('mObs').value.trim() || null : null)
+      : (document.getElementById('mObsMonitor') ? document.getElementById('mObsMonitor').value.trim() || null : null);
     try {
       await db('registos', {method:'POST', body:{monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, data, entrada:ent, saida:sai, pausa_inicio:pausaInicio, pausa_fim:pausaFim, observacoes:obs, funcao, parque, equipa, tipo_dia:'normal', estado:'pendente'}});
       err.style.color = 'var(--green)'; err.textContent = 'Registo submetido com sucesso!';
@@ -593,6 +619,7 @@ async function submeterRegisto() {
       if (document.getElementById('mPausaInicioMonitor')) document.getElementById('mPausaInicioMonitor').value = '';
       if (document.getElementById('mPausaFimMonitor')) document.getElementById('mPausaFimMonitor').value = '';
       if (document.getElementById('mObs')) document.getElementById('mObs').value = '';
+      if (document.getElementById('mObsMonitor')) document.getElementById('mObsMonitor').value = '';
       if (funcaoEl) funcaoEl.checked = false;
       const parqueChecked = document.querySelector('input[name="mParque"]:checked');
       if (parqueChecked) parqueChecked.checked = false;
@@ -810,8 +837,14 @@ function abrirModal(id) {
     pausaRow.style.display = 'block';
     document.getElementById('modalPausaInicio').value = r.pausa_inicio||'';
     document.getElementById('modalPausaFim').value = r.pausa_fim||'';
-    if (gestorTipo === 'interno') {
-      document.getElementById('modalObs').value = r.observacoes||'';
+    document.getElementById('modalObs').value = r.observacoes||'';
+  }
+  const funcaoRow = document.getElementById('modalFuncaoRow');
+  if (funcaoRow) {
+    funcaoRow.style.display = gestorTipo === 'monitores' ? 'block' : 'none';
+    if (gestorTipo === 'monitores') {
+      document.getElementById('modalFuncao').value = r.funcao||'Monitor';
+      document.getElementById('modalParque').value = r.parque||'Color Party';
     }
   }
   const upd=()=>{
@@ -837,8 +870,10 @@ async function confirmarEdicao() {
   const body = {data,entrada:ent,saida:sai,estado:'aprovado'};
   body.pausa_inicio = document.getElementById('modalPausaInicio').value||null;
   body.pausa_fim = document.getElementById('modalPausaFim').value||null;
-  if(gestorTipo==='interno') {
-    body.observacoes = document.getElementById('modalObs').value.trim()||null;
+  body.observacoes = document.getElementById('modalObs').value.trim()||null;
+  if(gestorTipo==='monitores') {
+    body.funcao = document.getElementById('modalFuncao').value||null;
+    body.parque = document.getElementById('modalParque').value||null;
   }
   try { await db(`registos?id=eq.${modalId}`,{method:'PATCH',body,prefer:'return=minimal',headers:{}}); fecharModal(); await carregarGestor(); }
   catch(e){err.textContent='Erro ao guardar.';}
@@ -902,18 +937,33 @@ function gerarFolhasPontoPDF() {
           if (isInterno) {
             rows.push(`<tr><td>${dataFmt}</td><td>${reg.entrada||''}</td><td>${reg.pausa_inicio||''}</td><td>${reg.pausa_fim||''}</td><td>${reg.saida||''}</td><td>${Math.floor(liq/60)}:${String(liq%60).padStart(2,'0')}</td><td class="obs-cell">${reg.observacoes||''}</td></tr>`);
           } else {
-            rows.push(`<tr><td>${dataFmt}</td><td>${reg.funcao||'—'}</td><td>${reg.parque||'—'}</td><td>${reg.entrada||''}</td><td>${reg.saida||''}</td><td>${Math.floor(liq/60)}:${String(liq%60).padStart(2,'0')}</td></tr>`);
+            rows.push(`<tr><td>${dataFmt}</td><td>${reg.funcao||'—'}</td><td>${reg.parque||'—'}</td><td>${reg.entrada||''}</td><td>${reg.saida||''}</td><td>${Math.floor(liq/60)}:${String(liq%60).padStart(2,'0')}</td><td class="obs-cell">${reg.observacoes||''}</td></tr>`);
           }
         }
       } else {
         if (isInterno) {
           rows.push(`<tr><td>${dataFmt}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`);
         } else {
-          rows.push(`<tr><td>${dataFmt}</td><td></td><td></td><td></td><td></td><td></td></tr>`);
+          rows.push(`<tr><td>${dataFmt}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`);
         }
       }
     }
     const tH=Math.floor(totalMin/60), tM=totalMin%60;
+    // Resumo por função para monitores
+    let funcaoResumo = '';
+    if (!isInterno) {
+      const minsPorFuncao = {};
+      regs.filter(r=>r.saida&&r.entrada&&r.tipo_dia!=='ferias').forEach(r=>{
+        const f = r.funcao||'—';
+        const bruto = calcMin(r.entrada,r.saida);
+        const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+        minsPorFuncao[f] = (minsPorFuncao[f]||0) + Math.max(bruto-pausa,0);
+      });
+      const funcaoRows = Object.entries(minsPorFuncao).map(([f,m])=>`<tr><td style="text-align:left;padding:4px 6px;">${f}</td><td style="padding:4px 6px;">${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}</td></tr>`).join('');
+      funcaoResumo = `<p style="font-size:11px;font-weight:bold;margin:10px 0 4px;text-transform:uppercase;letter-spacing:0.05em;">Resumo por função</p>
+        <table style="width:auto;margin-bottom:12px;"><thead><tr><th style="text-align:left;">Função</th><th>Total Horas</th></tr></thead>
+        <tbody>${funcaoRows}<tr class="total-row"><td style="text-align:left;padding:4px 6px;">TOTAL</td><td style="padding:4px 6px;">${tH}:${String(tM).padStart(2,'0')}</td></tr></tbody></table>`;
+    }
     html += `<div class="page"><h1>Folha de Ponto — ${nomeMes} ${ano}</h1>
       <div class="info-grid">
         <div class="info-row"><span class="info-label">Nome:</span><span>${nome}</span></div>
@@ -921,8 +971,9 @@ function gerarFolhasPontoPDF() {
         <div class="info-row"><span class="info-label">Empresa:</span><span>Pátio dos Traquinas, UNIP. LDA</span></div>
         <div class="info-row"><span class="info-label">Dias trabalhados:</span><span>${diasTrab}</span></div>
       </div>
-      <table><thead><tr>${isInterno ? '<th>Data</th><th>Entrada</th><th>Início Pausa</th><th>Fim Pausa</th><th>Saída</th><th>Total Horas</th><th>Observações</th>' : '<th>Data</th><th>Função</th><th>Parque</th><th>Entrada</th><th>Saída</th><th>Total Horas</th>'}</tr></thead>
-      <tbody>${rows.join('')}<tr class="total-row"><td colspan="${isInterno?5:4}">TOTAL TRABALHADAS (MÊS)</td><td>${tH}:${String(tM).padStart(2,'0')}</td>${isInterno?'<td></td>':''}</tr></tbody></table>
+      <table><thead><tr>${isInterno ? '<th>Data</th><th>Entrada</th><th>Início Pausa</th><th>Fim Pausa</th><th>Saída</th><th>Total Horas</th><th>Observações</th>' : '<th>Data</th><th>Função</th><th>Parque</th><th>Entrada</th><th>Saída</th><th>Total Horas</th><th>Observações</th>'}</tr></thead>
+      <tbody>${rows.join('')}<tr class="total-row"><td colspan="${isInterno?5:5}">TOTAL TRABALHADAS (MÊS)</td><td>${tH}:${String(tM).padStart(2,'0')}</td><td></td></tr></tbody></table>
+      ${funcaoResumo}
       <div class="assinaturas"><div class="ass-box">Assinatura do Colaborador</div><div class="ass-box">Assinatura do Gestor</div><div class="ass-box">Data</div></div>
     </div>`;
   });
