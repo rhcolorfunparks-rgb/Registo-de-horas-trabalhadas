@@ -963,7 +963,7 @@ function gerarFolhasPontoPDF() {
           rows.push(`<tr><td>${dataFmt}</td><td colspan="4" class="tipo-especial">${tipoDia.charAt(0).toUpperCase()+tipoDia.slice(1)}</td><td>0:00</td><td class="obs-cell">${reg.observacoes||''}</td></tr>`);
         } else {
           const min = reg.entrada&&reg.saida?calcMin(reg.entrada,reg.saida):0;
-          const pausaMin = isInterno&&reg.pausa_inicio&&reg.pausa_fim?calcMin(reg.pausa_inicio,reg.pausa_fim):0;
+          const pausaMin = reg.pausa_inicio&&reg.pausa_fim?calcMin(reg.pausa_inicio,reg.pausa_fim):0;
           const liq = Math.max(min-pausaMin, 0);
           totalMin += liq; diasTrab++;
           if (isInterno) {
