@@ -343,6 +343,7 @@
       <button class="tab" id="tabApr" onclick="mudarTab('aprovado')">Aprovados</button>
       <button class="tab" id="tabRej" onclick="mudarTab('rejeitado')">Rejeitados</button>
       <button class="tab" id="tabMon" onclick="mudarTab('monitores')">Gerir colaboradores</button>
+      <button class="tab" id="tabAlertas" onclick="mudarTab('alertas')" style="color:#A32D2D;">Alertas <span id="badgeAlertas"></span></button>
     </div>
     <div id="parqueFiltroSection" style="display:none;margin-bottom:1rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -358,6 +359,22 @@
 </div>
 
 <!-- MODAL EDITAR -->
+<div class="modal-overlay" id="modalErroOverlay">
+  <div class="modal-box">
+    <div class="modal-title">Reportar erro</div>
+    <div class="modal-sub">Descreva o erro para o gestor corrigir</div>
+    <div class="field">
+      <label>Descrição do erro</label>
+      <input type="text" id="erroDescricao" placeholder="Ex: Enganei-me na hora de entrada, são 9h15 e não 9h30">
+    </div>
+    <div class="modal-acoes">
+      <button class="btn-confirmar" onclick="submeterAlerta()" style="background:var(--red);border-color:var(--red);">Enviar alerta</button>
+      <button class="btn-cancelar" onclick="fecharReportarErro()">Cancelar</button>
+    </div>
+    <div class="msg erro" id="erroMsg"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal-box">
     <div class="modal-title">Editar registo</div>
@@ -574,7 +591,9 @@ function renderListaMonitor(regs) {
     const horasInfo = tipoDia ? `<strong>${tipoDia}</strong>` : `${r.entrada||'—'} → ${r.saida||'—'} · <strong>${h}</strong>${parqueTag}`;
     const pausaInfo = r.pausa_inicio && r.pausa_fim ? ` · Pausa: ${r.pausa_inicio}–${r.pausa_fim}` : '';
     const obsInfo = r.observacoes ? `<span style="font-size:11px;color:var(--muted);display:block;margin-top:2px;">📝 ${r.observacoes}</span>` : '';
-    d.innerHTML = `<span style="font-size:13px;color:var(--muted)">${fmtData(r.data)}</span><div style="font-size:13px;">${horasInfo}${pausaInfo}${obsInfo}</div>${fc?`<span style="font-size:12px;font-weight:600;color:var(--accent);background:var(--bg);padding:2px 8px;border-radius:20px;">${fc}</span>`:''}<span class="badge badge-${est==='aprovado'?'ok':est==='rejeitado'?'rej':'pend'}">${est==='aprovado'?'Aprovado':est==='rejeitado'?'Rejeitado':'Pendente'}</span>`;
+    const alertaInfo = r.alerta ? `<span style="font-size:11px;color:#A32D2D;display:block;margin-top:2px;">⚠️ Erro reportado: ${r.alerta}</span>` : '';
+    const btnReportar = !r.alerta && est !== 'rejeitado' ? `<button onclick="abrirReportarErro('${r.id}')" style="font-size:11px;padding:2px 8px;cursor:pointer;border-radius:8px;color:#888;border:0.5px solid #ccc;background:transparent;margin-top:6px;">⚠️ Reportar erro</button>` : '';
+    d.innerHTML = `<span style="font-size:13px;color:var(--muted)">${fmtData(r.data)}</span><div style="font-size:13px;">${horasInfo}${pausaInfo}${obsInfo}${alertaInfo}${btnReportar}</div>${fc?`<span style="font-size:12px;font-weight:600;color:var(--accent);background:var(--bg);padding:2px 8px;border-radius:20px;">${fc}</span>`:''}<span class="badge badge-${est==='aprovado'?'ok':est==='rejeitado'?'rej':'pend'}">${est==='aprovado'?'Aprovado':est==='rejeitado'?'Rejeitado':'Pendente'}</span>`;
     el.appendChild(d);
   });
 }
@@ -705,6 +724,11 @@ function renderStats() {
   const apr = registosCache.filter(r=>r.estado==='aprovado'&&r.saida);
   const min = apr.reduce((s,r)=>s+calcMin(r.entrada,r.saida),0);
   document.getElementById('gHoras').textContent = `${Math.floor(min/60)}h ${min%60}min`;
+  const nAlertas = registosCache.filter(r=>r.alerta).length;
+  const badge = document.getElementById('badgeAlertas');
+  if (badge) badge.textContent = nAlertas > 0 ? `(${nAlertas})` : '';
+  const tabAlertas = document.getElementById('tabAlertas');
+  if (tabAlertas) tabAlertas.style.display = nAlertas > 0 || gestorTipo === 'monitores' ? 'inline-block' : 'none';
   ['Monitor','Mentor','Coordenador'].forEach(f => {
     const m = apr.filter(r=>r.funcao===f).reduce((s,r)=>s+calcMin(r.entrada,r.saida),0);
     document.getElementById('gHoras'+f).textContent = `${Math.floor(m/60)}h ${m%60}min`;
@@ -723,13 +747,14 @@ function mudarFiltroParque(p) {
   renderTab();
 }
 function atualizarTabs() {
-  [['tabPend','pendente'],['tabApr','aprovado'],['tabRej','rejeitado'],['tabMon','monitores']].forEach(([id,v])=>{
+  [['tabPend','pendente'],['tabApr','aprovado'],['tabRej','rejeitado'],['tabMon','monitores'],['tabAlertas','alertas']].forEach(([id,v])=>{
     document.getElementById(id).className = 'tab'+(tabAtiva===v?' ativo':'');
   });
 }
 function renderTab() {
   const el = document.getElementById('conteudoTab'); el.innerHTML='';
   if (tabAtiva==='monitores') { renderMonitores(el); return; }
+  if (tabAtiva==='alertas') { renderAlertas(el); return; }
   let regs = registosCache.filter(r=>r.estado===tabAtiva);
   if (gestorTipo==='monitores' && filtroParque !== 'todos') regs = regs.filter(r=>r.parque===filtroParque);
   if (!regs.length) { el.innerHTML=`<div class="empty">Sem registos ${tabAtiva==='pendente'?'pendentes':tabAtiva==='aprovado'?'aprovados':'rejeitados'} neste período.</div>`; return; }
@@ -800,6 +825,36 @@ async function apagarTodosRejeitados() {
     await carregarGestor();
   } catch(e){}
 }
+function renderAlertas(el) {
+  const alertas = registosCache.filter(r=>r.alerta);
+  if (!alertas.length) {
+    el.innerHTML = '<div class="empty">Sem alertas de erro pendentes.</div>';
+    return;
+  }
+  alertas.forEach(r => {
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:12px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;';
+    div.innerHTML = `
+      <div>
+        <p style="font-size:14px;font-weight:600;margin:0 0 2px;">${r.monitor_nome} · ${fmtData(r.data)}</p>
+        <p style="font-size:13px;color:var(--muted);margin:0 0 4px;">${r.entrada||'—'} → ${r.saida||'—'}</p>
+        <p style="font-size:13px;color:#A32D2D;margin:0;">⚠️ ${r.alerta}</p>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn-act edit" onclick="abrirModal('${r.id}')">Editar e corrigir</button>
+        <button class="btn-act apr" onclick="resolverAlerta('${r.id}')">Marcar resolvido</button>
+      </div>`;
+    el.appendChild(div);
+  });
+}
+
+async function resolverAlerta(id) {
+  try {
+    await db(`registos?id=eq.${id}`, {method:'PATCH', body:{alerta:null}, prefer:'return=minimal', headers:{}});
+    await carregarGestor();
+  } catch(e){}
+}
+
 function renderMonitores(el) {
   const add=document.createElement('div'); add.className='add-monitor';
   add.innerHTML=`<input type="text" id="gNome" placeholder="Nome do monitor"><input type="text" id="gPin" placeholder="PIN (4 dígitos)" maxlength="4"><button onclick="adicionarMonitor()">Adicionar</button>`;
@@ -893,6 +948,33 @@ function exportarCSV() {
   regs.forEach(r=>csv+=`"${r.monitor_nome}",${fmtData(r.data)},${r.tipo_dia||'normal'},"${r.funcao||'—'}","${r.parque||'—'}",${r.entrada||''},${r.pausa_inicio||''},${r.pausa_fim||''},${r.saida||''},${r.entrada&&r.saida?(calcMin(r.entrada,r.saida)/60).toFixed(2):'0'},"${r.observacoes||''}"\n`);
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download=`horas_${MESES[parseInt(mes)-1]}_${ano}.csv`;a.click();
+}
+
+let registoErroId = null;
+
+function abrirReportarErro(id) {
+  registoErroId = id;
+  document.getElementById('erroDescricao').value = '';
+  document.getElementById('erroMsg').textContent = '';
+  document.getElementById('modalErroOverlay').classList.add('aberto');
+}
+function fecharReportarErro() {
+  document.getElementById('modalErroOverlay').classList.remove('aberto');
+}
+async function submeterAlerta() {
+  const desc = document.getElementById('erroDescricao').value.trim();
+  const err = document.getElementById('erroMsg');
+  if (!desc) return err.textContent = 'Descreva o erro antes de enviar.';
+  try {
+    await db(`registos?id=eq.${registoErroId}`, {method:'PATCH', body:{alerta:desc}, prefer:'return=minimal', headers:{}});
+    fecharReportarErro();
+    err.textContent = '';
+    await carregarMonitor();
+    const mErro = document.getElementById('mErro');
+    mErro.style.color = 'var(--green)';
+    mErro.textContent = 'Alerta enviado ao gestor!';
+    setTimeout(()=>{ mErro.textContent=''; mErro.style.color='var(--red)'; }, 3000);
+  } catch(e) { err.textContent = 'Erro ao enviar. Tente novamente.'; }
 }
 
 function popularSelectorPDF() {
