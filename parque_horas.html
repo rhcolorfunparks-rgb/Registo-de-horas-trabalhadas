@@ -765,6 +765,15 @@ function renderStats() {
   });
 }
 function mudarTab(t) { tabAtiva=t; atualizarTabs(); renderTab(); }
+function mudarFiltroFuncao(f) {
+  filtroFuncao = f;
+  ['filtroFuncaoTodas','filtroFuncaoMonitor','filtroFuncaoMentor','filtroFuncaoCoordenador'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.className = 'tab';
+  });
+  const idMap = {'todas':'filtroFuncaoTodas','Monitor':'filtroFuncaoMonitor','Mentor':'filtroFuncaoMentor','Coordenador':'filtroFuncaoCoordenador'};
+  const activeEl = document.getElementById(idMap[f]); if (activeEl) activeEl.className = 'tab ativo';
+  renderTab();
+}
 function mudarFiltroParque(p) {
   filtroParque = p;
   ['filtroTodos','filtroColorParty','filtroYupiColor'].forEach(id => {
