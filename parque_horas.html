@@ -295,13 +295,14 @@
       <!-- Observações (monitores) -->
       <div id="obsMonitorSection" style="display:none;margin-bottom:10px;">
         <label style="display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:4px;">Observações</label>
-        <input type="text" id="mObsMonitor" placeholder="Ex: Prolongamento de hora, substituição, feriado trabalhado..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
+        <input type="text" id="mObsMonitor" placeholder="Ex: Prolongamento de hora, substituição..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
       </div>
       <div id="mPreview" style="font-size:13px;color:var(--muted);margin-bottom:12px;min-height:18px;font-weight:500;"></div>
       <button onclick="submeterRegisto()" style="width:100%;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Submeter registo</button>
     </div>
     <div class="msg erro" id="mErro"></div>
     <div id="notificacoesMonitor" style="display:none;margin-bottom:1rem;"></div>
+    <div id="totalFuncaoMonitor" style="display:none;margin-bottom:1rem;"></div>
     <div class="card">
       <div class="card-title">Os meus registos recentes</div>
       <div id="listaMonitor"><div class="loading">A carregar...</div></div>
@@ -584,6 +585,43 @@ async function iniciarMonitor() {
   });
   await carregarMonitor();
 }
+function renderTotalFuncaoMonitor(regs) {
+  const el = document.getElementById('totalFuncaoMonitor');
+  if (!el || monitorAtual.equipa === 'interno') { if(el) el.style.display='none'; return; }
+  const minsPorFuncao = {};
+  regs.filter(r=>r.estado==='aprovado'&&r.saida&&r.entrada).forEach(r=>{
+    const f = r.funcao||'—';
+    const bruto = calcMin(r.entrada,r.saida);
+    const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+    minsPorFuncao[f] = (minsPorFuncao[f]||0) + Math.max(bruto-pausa,0);
+  });
+  if (!Object.keys(minsPorFuncao).length) { el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;">
+    <p style="font-size:13px;font-weight:600;margin:0 0 10px;">Total de horas aprovadas</p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      ${Object.entries(minsPorFuncao).map(([f,m])=>`
+        <div style="background:var(--bg);border-radius:var(--radius-sm);padding:8px 16px;text-align:center;">
+          <div style="font-size:11px;color:var(--muted);font-weight:500;text-transform:uppercase;margin-bottom:2px;">${f}</div>
+          <div style="font-size:18px;font-weight:600;">${Math.floor(m/60)}h ${m%60}min</div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+
+function renderNotificacoes(regs) {
+  const el = document.getElementById('notificacoesMonitor');
+  if (!el) return;
+  const notifs = [];
+  regs.forEach(r => {
+    if (r.alerta_gestor) notifs.push({cor:'#FAEEDA', texto:`📣 Mensagem do gestor (${fmtData(r.data)}): ${r.alerta_gestor}`});
+    if (r.alerta && r.alerta_resolvido) notifs.push({cor:'#EAF3DE', texto:`✅ Erro de ${fmtData(r.data)} foi resolvido pelo gestor`});
+  });
+  if (!notifs.length) { el.style.display='none'; return; }
+  el.style.display='block';
+  el.innerHTML = notifs.map(n=>`<div style="background:${n.cor};border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px;font-size:13px;">${n.texto}</div>`).join('');
+}
+
 async function carregarMonitor() {
   try {
     const regs = await db(`registos?monitor_id=eq.${monitorAtual.id}&order=data.desc,criado_em.desc&limit=30`) || [];
