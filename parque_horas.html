@@ -614,12 +614,27 @@ function renderNotificacoes(regs) {
   if (!el) return;
   const notifs = [];
   regs.forEach(r => {
-    if (r.alerta_gestor) notifs.push({cor:'#FAEEDA', texto:`📣 Mensagem do gestor (${fmtData(r.data)}): ${r.alerta_gestor}`});
-    if (r.alerta && r.alerta_resolvido) notifs.push({cor:'#EAF3DE', texto:`✅ Erro de ${fmtData(r.data)} foi resolvido pelo gestor`});
+    if (r.alerta_gestor && !r.visto_monitor) {
+      notifs.push({cor:'#FAEEDA', texto:`📣 Mensagem do gestor (${fmtData(r.data)}): ${r.alerta_gestor}`, id:r.id, tipo:'gestor'});
+    }
+    if (r.alerta_resolvido && !r.visto_monitor) {
+      notifs.push({cor:'#EAF3DE', texto:`✅ Erro de ${fmtData(r.data)} foi resolvido pelo gestor`, id:r.id, tipo:'resolvido'});
+    }
   });
   if (!notifs.length) { el.style.display='none'; return; }
   el.style.display='block';
-  el.innerHTML = notifs.map(n=>`<div style="background:${n.cor};border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px;font-size:13px;">${n.texto}</div>`).join('');
+  el.innerHTML = notifs.map(n=>`
+    <div style="background:${n.cor};border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+      <span>${n.texto}</span>
+      <button onclick="dispensarNotificacao('${n.id}')" style="font-size:11px;padding:2px 8px;cursor:pointer;border-radius:8px;border:0.5px solid #ccc;background:transparent;white-space:nowrap;">✕ Dispensar</button>
+    </div>`).join('');
+}
+
+async function dispensarNotificacao(id) {
+  try {
+    await db(`registos?id=eq.${id}`, {method:'PATCH', body:{visto_monitor:true}, prefer:'return=minimal', headers:{}});
+    await carregarMonitor();
+  } catch(e) {}
 }
 
 async function carregarMonitor() {
@@ -922,13 +937,14 @@ function renderAlertas(el) {
         <button class="btn-act edit" onclick="abrirModal('${r.id}')">Editar e corrigir</button>
         <button class="btn-act apr" onclick="resolverAlerta('${r.id}')">Marcar resolvido</button>
       </div>`;
+    // Mark as seen by gestor (keep alerta but note gestor viewed it)
     el.appendChild(div);
   });
 }
 
 async function resolverAlerta(id) {
   try {
-    await db(`registos?id=eq.${id}`, {method:'PATCH', body:{alerta:null}, prefer:'return=minimal', headers:{}});
+    await db(`registos?id=eq.${id}`, {method:'PATCH', body:{alerta:null, alerta_resolvido:true, visto_monitor:false}, prefer:'return=minimal', headers:{}});
     await carregarGestor();
   } catch(e){}
 }
@@ -966,7 +982,7 @@ async function confirmarAlertaGestor() {
     // Find most recent registo of this monitor and add gestor alert
     const regs = registosCache.filter(r=>r.monitor_id===alertaGestorMonitorId||r.monitor_nome===monitoresCache.find(m=>m.id===alertaGestorMonitorId)?.nome);
     if (regs.length) {
-      await db(`registos?id=eq.${regs[0].id}`, {method:'PATCH', body:{alerta_gestor:msg}, prefer:'return=minimal', headers:{}});
+      await db(`registos?id=eq.${regs[0].id}`, {method:'PATCH', body:{alerta_gestor:msg, visto_monitor:false}, prefer:'return=minimal', headers:{}});
     }
     fecharAlertaGestor();
     await carregarGestor();
@@ -1082,7 +1098,7 @@ async function submeterAlerta() {
   const err = document.getElementById('erroMsg');
   if (!desc) return err.textContent = 'Descreva o erro antes de enviar.';
   try {
-    await db(`registos?id=eq.${registoErroId}`, {method:'PATCH', body:{alerta:desc}, prefer:'return=minimal', headers:{}});
+    await db(`registos?id=eq.${registoErroId}`, {method:'PATCH', body:{alerta:desc, alerta_resolvido:false, visto_monitor:false}, prefer:'return=minimal', headers:{}});
     fecharReportarErro();
     err.textContent = '';
     await carregarMonitor();
