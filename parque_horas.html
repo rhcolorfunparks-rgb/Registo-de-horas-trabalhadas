@@ -295,12 +295,13 @@
       <!-- Observações (monitores) -->
       <div id="obsMonitorSection" style="display:none;margin-bottom:10px;">
         <label style="display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:4px;">Observações</label>
-        <input type="text" id="mObsMonitor" placeholder="Ex: Atraso, prolongamento de hora, substituição..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
+        <input type="text" id="mObsMonitor" placeholder="Ex: Prolongamento de hora, substituição, feriado trabalhado..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
       </div>
       <div id="mPreview" style="font-size:13px;color:var(--muted);margin-bottom:12px;min-height:18px;font-weight:500;"></div>
       <button onclick="submeterRegisto()" style="width:100%;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Submeter registo</button>
     </div>
     <div class="msg erro" id="mErro"></div>
+    <div id="notificacoesMonitor" style="display:none;margin-bottom:1rem;"></div>
     <div class="card">
       <div class="card-title">Os meus registos recentes</div>
       <div id="listaMonitor"><div class="loading">A carregar...</div></div>
@@ -345,11 +346,19 @@
       <button class="tab" id="tabMon" onclick="mudarTab('monitores')">Gerir colaboradores</button>
       <button class="tab" id="tabAlertas" onclick="mudarTab('alertas')" style="color:#A32D2D;">Alertas <span id="badgeAlertas"></span></button>
     </div>
-    <div id="parqueFiltroSection" style="display:none;margin-bottom:1rem;">
+    <div id="parqueFiltroSection" style="display:none;margin-bottom:0.5rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="tab ativo" id="filtroTodos" onclick="mudarFiltroParque('todos')">Todos</button>
         <button class="tab" id="filtroColorParty" onclick="mudarFiltroParque('Color Party')">Color Party</button>
         <button class="tab" id="filtroYupiColor" onclick="mudarFiltroParque('Yupi Color')">Yupi Color</button>
+      </div>
+    </div>
+    <div id="funcaoFiltroSection" style="display:none;margin-bottom:1rem;">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="tab ativo" id="filtroFuncaoTodas" onclick="mudarFiltroFuncao('todas')">Todas as funções</button>
+        <button class="tab" id="filtroFuncaoMonitor" onclick="mudarFiltroFuncao('Monitor')">Monitor</button>
+        <button class="tab" id="filtroFuncaoMentor" onclick="mudarFiltroFuncao('Mentor')">Mentor</button>
+        <button class="tab" id="filtroFuncaoCoordenador" onclick="mudarFiltroFuncao('Coordenador')">Coordenador</button>
       </div>
     </div>
     <div class="card" style="padding: 0 1.25rem;">
@@ -359,6 +368,22 @@
 </div>
 
 <!-- MODAL EDITAR -->
+<div class="modal-overlay" id="modalAlertaGestorOverlay">
+  <div class="modal-box">
+    <div class="modal-title">Enviar alerta ao monitor</div>
+    <div class="modal-sub" id="alertaGestorNome"></div>
+    <div class="field">
+      <label>Mensagem</label>
+      <input type="text" id="alertaGestorMsg" placeholder="Ex: Por favor corrija a hora de entrada do dia 5">
+    </div>
+    <div class="modal-acoes">
+      <button class="btn-confirmar" onclick="confirmarAlertaGestor()">Enviar</button>
+      <button class="btn-cancelar" onclick="fecharAlertaGestor()">Cancelar</button>
+    </div>
+    <div class="msg erro" id="alertaGestorErro"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalErroOverlay">
   <div class="modal-box">
     <div class="modal-title">Reportar erro</div>
@@ -429,6 +454,7 @@ let monitorAtual = null;
 let gestorTipo = 'monitores'; // 'monitores' ou 'interno'
 let tabAtiva = 'pendente';
 let filtroParque = 'todos';
+let filtroFuncao = 'todas';
 let registosCache = [];
 let monitoresCache = [];
 let modalId = null;
@@ -560,8 +586,10 @@ async function iniciarMonitor() {
 }
 async function carregarMonitor() {
   try {
-    const regs = await db(`registos?monitor_id=eq.${monitorAtual.id}&order=data.desc,criado_em.desc&limit=10`) || [];
+    const regs = await db(`registos?monitor_id=eq.${monitorAtual.id}&order=data.desc,criado_em.desc&limit=30`) || [];
     renderListaMonitor(regs);
+    renderTotalFuncaoMonitor(regs);
+    renderNotificacoes(regs);
     const hoje = regs.find(r => r.data === hojeISO());
     if (hoje) {
       const hs = hoje.saida ? `${hoje.entrada} → ${hoje.saida} · ${minStr(calcMin(hoje.entrada,hoje.saida))}` : `Entrada: ${hoje.entrada} — a decorrer`;
@@ -685,7 +713,9 @@ async function iniciarGestor() {
   // Show parque filter only for monitores
   const pfs = document.getElementById('parqueFiltroSection');
   if (pfs) pfs.style.display = gestorTipo === 'monitores' ? 'block' : 'none';
-  filtroParque = 'todos';
+  const ffs = document.getElementById('funcaoFiltroSection');
+  if (ffs) ffs.style.display = gestorTipo === 'monitores' ? 'block' : 'none';
+  filtroParque = 'todos'; filtroFuncao = 'todas';
   const ano = new Date().getFullYear();
   const sm = document.getElementById('gMes'), sa = document.getElementById('gAno');
   sm.innerHTML = MESES.map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
@@ -757,6 +787,7 @@ function renderTab() {
   if (tabAtiva==='alertas') { renderAlertas(el); return; }
   let regs = registosCache.filter(r=>r.estado===tabAtiva);
   if (gestorTipo==='monitores' && filtroParque !== 'todos') regs = regs.filter(r=>r.parque===filtroParque);
+  if (gestorTipo==='monitores' && filtroFuncao !== 'todas') regs = regs.filter(r=>r.funcao===filtroFuncao);
   if (!regs.length) { el.innerHTML=`<div class="empty">Sem registos ${tabAtiva==='pendente'?'pendentes':tabAtiva==='aprovado'?'aprovados':'rejeitados'} neste período.</div>`; return; }
   // Calculate weekly hours per collaborator for equipa interna warning
   const horasSemanais = {};
@@ -857,16 +888,54 @@ async function resolverAlerta(id) {
 
 function renderMonitores(el) {
   const add=document.createElement('div'); add.className='add-monitor';
-  add.innerHTML=`<input type="text" id="gNome" placeholder="Nome do monitor"><input type="text" id="gPin" placeholder="PIN (4 dígitos)" maxlength="4"><button onclick="adicionarMonitor()">Adicionar</button>`;
+  const pinGerado = gerarPinUnico();
+  add.innerHTML=`<input type="text" id="gNome" placeholder="Nome do colaborador" style="flex:1;min-width:130px;font-size:13px;"><input type="text" id="gPin" placeholder="PIN" maxlength="4" value="${pinGerado}" style="width:90px;font-size:13px;"><button onclick="gerarNovoPIN()" style="font-size:12px;padding:6px 8px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg);" title="Gerar novo PIN">🔄</button><button onclick="adicionarMonitor()" style="font-size:13px;padding:6px 14px;cursor:pointer;border-radius:var(--radius-sm);">Adicionar</button>`;
   el.appendChild(add);
   const em=document.createElement('div'); em.id='gErro'; em.className='msg erro'; el.appendChild(em);
   if (!monitoresCache.length) { el.innerHTML+='<div class="empty">Sem monitores. Adicione o primeiro acima.</div>'; return; }
   monitoresCache.forEach(m=>{
     const nR=registosCache.filter(r=>r.monitor_id===m.id).length;
     const row=document.createElement('div'); row.className='monitor-row';
-    row.innerHTML=`<div><strong style="font-size:14px">${m.nome}</strong><div style="font-size:12px;color:var(--muted);margin-top:2px">PIN: ${m.pin} · ${nR} registo${nR!==1?'s':''} neste mês</div></div><button class="btn-act rej" onclick="removerMonitor('${m.id}')">Remover</button>`;
+    row.innerHTML=`<div><strong style="font-size:14px">${m.nome}</strong><div style="font-size:12px;color:var(--muted);margin-top:2px">PIN: ${m.pin} · ${nR} registo${nR!==1?'s':''} neste mês</div></div><div style="display:flex;gap:6px;"><button class="btn-act edit" onclick="enviarAlertaGestor('${m.id}','${m.nome}')">📣 Alertar</button><button class="btn-act rej" onclick="removerMonitor('${m.id}')">Remover</button></div>`;
     el.appendChild(row);
   });
+}
+let alertaGestorMonitorId = null;
+function enviarAlertaGestor(id, nome) {
+  alertaGestorMonitorId = id;
+  document.getElementById('alertaGestorNome').textContent = nome;
+  document.getElementById('alertaGestorMsg').value = '';
+  document.getElementById('alertaGestorErro').textContent = '';
+  document.getElementById('modalAlertaGestorOverlay').classList.add('aberto');
+}
+function fecharAlertaGestor() {
+  document.getElementById('modalAlertaGestorOverlay').classList.remove('aberto');
+}
+async function confirmarAlertaGestor() {
+  const msg = document.getElementById('alertaGestorMsg').value.trim();
+  const err = document.getElementById('alertaGestorErro');
+  if (!msg) return err.textContent = 'Escreva uma mensagem antes de enviar.';
+  try {
+    // Find most recent registo of this monitor and add gestor alert
+    const regs = registosCache.filter(r=>r.monitor_id===alertaGestorMonitorId||r.monitor_nome===monitoresCache.find(m=>m.id===alertaGestorMonitorId)?.nome);
+    if (regs.length) {
+      await db(`registos?id=eq.${regs[0].id}`, {method:'PATCH', body:{alerta_gestor:msg}, prefer:'return=minimal', headers:{}});
+    }
+    fecharAlertaGestor();
+    await carregarGestor();
+  } catch(e) { err.textContent = 'Erro ao enviar.'; }
+}
+
+function gerarPinUnico() {
+  const pinsUsados = new Set(monitoresCache.map(m=>m.pin));
+  pinsUsados.add('0000'); pinsUsados.add('2522');
+  let pin;
+  do { pin = String(Math.floor(1000 + Math.random() * 9000)); } while (pinsUsados.has(pin));
+  return pin;
+}
+function gerarNovoPIN() {
+  const el = document.getElementById('gPin');
+  if (el) el.value = gerarPinUnico();
 }
 async function adicionarMonitor() {
   const nome=document.getElementById('gNome')?.value?.trim(), pin=document.getElementById('gPin')?.value?.trim();
@@ -1082,7 +1151,7 @@ function gerarFolhasPontoPDF() {
       <div class="info-grid">
         <div class="info-row"><span class="info-label">Nome:</span><span>${nome}</span></div>
         <div class="info-row"><span class="info-label">Mês / Ano:</span><span>${nomeMes} ${ano}</span></div>
-        <div class="info-row"><span class="info-label">Empresa:</span><span>Pátio dos Traquinas, UNIP. LDA</span></div>
+
         <div class="info-row"><span class="info-label">Dias trabalhados:</span><span>${diasTrab}</span></div>
       </div>
       <table><thead><tr>${isInterno ? '<th>Data</th><th>Entrada</th><th>Início Pausa</th><th>Fim Pausa</th><th>Saída</th><th>Total Horas</th><th>Observações</th>' : '<th>Data</th><th>Função</th><th>Parque</th><th>Entrada</th><th>Saída</th><th>Total Horas</th><th>Observações</th>'}</tr></thead>
