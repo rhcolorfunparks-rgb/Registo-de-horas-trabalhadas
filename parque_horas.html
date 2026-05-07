@@ -343,7 +343,7 @@
       <button class="tab ativo" id="tabPend" onclick="mudarTab('pendente')">Pendentes</button>
       <button class="tab" id="tabApr" onclick="mudarTab('aprovado')">Aprovados</button>
       <button class="tab" id="tabMon" onclick="mudarTab('monitores')">Gerir colaboradores</button>
-      <button class="tab" id="tabAlertas" onclick="mudarTab('alertas')" style="color:#A32D2D;">Alertas <span id="badgeAlertas"></span></button>
+      <button class="tab" id="tabAlertas" onclick="mudarTab('alertas')">Alertas <span id="badgeAlertas"></span></button>
     </div>
     <div id="parqueFiltroSection" style="display:none;margin-bottom:0.5rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -847,7 +847,10 @@ function renderStats() {
   const badge = document.getElementById('badgeAlertas');
   if (badge) badge.textContent = nAlertas > 0 ? `(${nAlertas})` : '';
   const tabAlertas = document.getElementById('tabAlertas');
-  if (tabAlertas) tabAlertas.style.display = nAlertas > 0 || gestorTipo === 'monitores' ? 'inline-block' : 'none';
+  if (tabAlertas) {
+    tabAlertas.style.color = nAlertas > 0 ? '#A32D2D' : '';
+    tabAlertas.style.fontWeight = nAlertas > 0 ? '700' : '';
+  }
   ['Monitor','Mentor','Coordenador'].forEach(f => {
     const m = apr.filter(r=>r.funcao===f).reduce((s,r)=>s+calcMin(r.entrada,r.saida),0);
     document.getElementById('gHoras'+f).textContent = `${Math.floor(m/60)}h ${m%60}min`;
