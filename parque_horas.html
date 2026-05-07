@@ -323,7 +323,6 @@
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">Pendentes</div><div class="stat-val pend" id="gPend">0</div></div>
       <div class="stat-card"><div class="stat-label">Aprovados</div><div class="stat-val ok" id="gApr">0</div></div>
-      <div class="stat-card"><div class="stat-label">Rejeitados</div><div class="stat-val rej" id="gRej">0</div></div>
       <div class="stat-card"><div class="stat-label">Horas aprovadas</div><div class="stat-val" id="gHoras">0h</div></div>
     </div>
     <div id="statsFuncao" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.5rem;">
@@ -343,7 +342,6 @@
     <div class="tabs">
       <button class="tab ativo" id="tabPend" onclick="mudarTab('pendente')">Pendentes</button>
       <button class="tab" id="tabApr" onclick="mudarTab('aprovado')">Aprovados</button>
-      <button class="tab" id="tabRej" onclick="mudarTab('rejeitado')">Rejeitados</button>
       <button class="tab" id="tabMon" onclick="mudarTab('monitores')">Gerir colaboradores</button>
       <button class="tab" id="tabAlertas" onclick="mudarTab('alertas')" style="color:#A32D2D;">Alertas <span id="badgeAlertas"></span></button>
     </div>
@@ -369,6 +367,17 @@
 </div>
 
 <!-- MODAL EDITAR -->
+<div class="modal-overlay" id="modalAlertaMonitorOverlay">
+  <div class="modal-box">
+    <div style="font-size:24px;text-align:center;margin-bottom:8px;">⚠️</div>
+    <div class="modal-title" style="text-align:center;">Tens um alerta do gestor</div>
+    <div id="alertaMonitorTexto" style="font-size:14px;color:var(--text);background:var(--bg);border-radius:var(--radius-sm);padding:12px;margin:12px 0;line-height:1.5;"></div>
+    <div class="modal-acoes">
+      <button class="btn-confirmar" onclick="tomarConhecimentoAlerta()" style="width:100%;">Tomei conhecimento</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalAlertaGestorOverlay">
   <div class="modal-box">
     <div class="modal-title">Enviar alerta ao monitor</div>
@@ -585,6 +594,36 @@ async function iniciarMonitor() {
   });
   await carregarMonitor();
 }
+let alertasQueue = [];
+let alertaAtualIdx = 0;
+
+function verificarAlertasMonitor(regs) {
+  alertasQueue = regs.filter(r => r.alerta_gestor && !r.visto_monitor);
+  alertaAtualIdx = 0;
+  if (alertasQueue.length > 0) mostrarProximoAlerta();
+}
+
+function mostrarProximoAlerta() {
+  if (alertaAtualIdx >= alertasQueue.length) return;
+  const r = alertasQueue[alertaAtualIdx];
+  document.getElementById('alertaMonitorTexto').textContent = r.alerta_gestor;
+  document.getElementById('modalAlertaMonitorOverlay').classList.add('aberto');
+}
+
+async function tomarConhecimentoAlerta() {
+  const r = alertasQueue[alertaAtualIdx];
+  try {
+    await db(`registos?id=eq.${r.id}`, {method:'PATCH', body:{visto_monitor:true}, prefer:'return=minimal', headers:{}});
+  } catch(e) {}
+  document.getElementById('modalAlertaMonitorOverlay').classList.remove('aberto');
+  alertaAtualIdx++;
+  if (alertaAtualIdx < alertasQueue.length) {
+    setTimeout(mostrarProximoAlerta, 300);
+  } else {
+    await carregarMonitor();
+  }
+}
+
 function renderTotalFuncaoMonitor(regs) {
   const el = document.getElementById('totalFuncaoMonitor');
   if (!el || monitorAtual.equipa === 'interno') { if(el) el.style.display='none'; return; }
@@ -614,9 +653,7 @@ function renderNotificacoes(regs) {
   if (!el) return;
   const notifs = [];
   regs.forEach(r => {
-    if (r.alerta_gestor && !r.visto_monitor) {
-      notifs.push({cor:'#FAEEDA', texto:`📣 Mensagem do gestor (${fmtData(r.data)}): ${r.alerta_gestor}`, id:r.id, tipo:'gestor'});
-    }
+    // alerta_gestor shown as popup, not inline
     if (r.alerta_resolvido && !r.visto_monitor) {
       notifs.push({cor:'#EAF3DE', texto:`✅ Erro de ${fmtData(r.data)} foi resolvido pelo gestor`, id:r.id, tipo:'resolvido'});
     }
@@ -626,7 +663,7 @@ function renderNotificacoes(regs) {
   el.innerHTML = notifs.map(n=>`
     <div style="background:${n.cor};border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:6px;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
       <span>${n.texto}</span>
-      <button onclick="dispensarNotificacao('${n.id}')" style="font-size:11px;padding:2px 8px;cursor:pointer;border-radius:8px;border:0.5px solid #ccc;background:transparent;white-space:nowrap;">✕ Dispensar</button>
+      <button onclick="dispensarNotificacao('${n.id}')" style="font-size:11px;padding:2px 8px;cursor:pointer;border-radius:8px;border:0.5px solid #ccc;background:transparent;white-space:nowrap;">Tomei conhecimento</button>
     </div>`).join('');
 }
 
@@ -643,6 +680,7 @@ async function carregarMonitor() {
     renderListaMonitor(regs);
     renderTotalFuncaoMonitor(regs);
     renderNotificacoes(regs);
+    verificarAlertasMonitor(regs);
     const hoje = regs.find(r => r.data === hojeISO());
     if (hoje) {
       const hs = hoje.saida ? `${hoje.entrada} → ${hoje.saida} · ${minStr(calcMin(hoje.entrada,hoje.saida))}` : `Entrada: ${hoje.entrada} — a decorrer`;
@@ -800,10 +838,8 @@ async function carregarGestor() {
 function renderStats() {
   const p=registosCache.filter(r=>r.estado==='pendente').length;
   const a=registosCache.filter(r=>r.estado==='aprovado').length;
-  const rj=registosCache.filter(r=>r.estado==='rejeitado').length;
   document.getElementById('gPend').textContent = p;
   document.getElementById('gApr').textContent = a;
-  document.getElementById('gRej').textContent = rj;
   const apr = registosCache.filter(r=>r.estado==='aprovado'&&r.saida);
   const min = apr.reduce((s,r)=>s+calcMin(r.entrada,r.saida),0);
   document.getElementById('gHoras').textContent = `${Math.floor(min/60)}h ${min%60}min`;
@@ -839,7 +875,7 @@ function mudarFiltroParque(p) {
   renderTab();
 }
 function atualizarTabs() {
-  [['tabPend','pendente'],['tabApr','aprovado'],['tabRej','rejeitado'],['tabMon','monitores'],['tabAlertas','alertas']].forEach(([id,v])=>{
+  [['tabPend','pendente'],['tabApr','aprovado'],['tabMon','monitores'],['tabAlertas','alertas']].forEach(([id,v])=>{
     document.getElementById(id).className = 'tab'+(tabAtiva===v?' ativo':'');
   });
 }
@@ -881,8 +917,8 @@ function renderTab() {
     const pMin = r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio,r.pausa_fim) : 0;
     const h = r.saida ? minStr(Math.max(brutoMin-pMin,0)) : '—';
     let ac='';
-    if (tabAtiva==='pendente') ac=`<button class="btn-act edit" onclick="abrirModal('${r.id}')">Editar</button><button class="btn-act apr" onclick="mudarEstado('${r.id}','aprovado')">Aprovar</button><button class="btn-act rej" onclick="mudarEstado('${r.id}','rejeitado')">Rejeitar</button>`;
-    else if (tabAtiva==='aprovado') ac=`<button class="btn-act edit" onclick="abrirModal('${r.id}')">Editar</button><button class="btn-act rej" onclick="mudarEstado('${r.id}','rejeitado')">Rejeitar</button>`;
+    if (tabAtiva==='pendente') ac=`<button class="btn-act edit" onclick="abrirModal('${r.id}')">Editar</button><button class="btn-act apr" onclick="mudarEstado('${r.id}','aprovado')">Aprovar</button><button class="btn-act rej" onclick="alertarMonitorRegisto('${r.id}','${r.monitor_nome}')">⚠️ Alertar</button>`;
+    else if (tabAtiva==='aprovado') ac=`<button class="btn-act edit" onclick="abrirModal('${r.id}')">Editar</button>`;
     else ac=`<button class="btn-act apr" onclick="mudarEstado('${r.id}','aprovado')">Aprovar</button><button class="btn-act rej" onclick="apagarRegisto('${r.id}')">Apagar</button>`;
     const parqueLabel = r.parque ? ` <span style='font-size:11px;font-weight:600;background:#f0f0f0;padding:1px 6px;border-radius:10px;'>${r.parque}</span>` : '';
     const tipoDiaLabel = r.tipo_dia && r.tipo_dia !== 'normal' ? ` <span class="badge badge-pend">${r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1)}</span>` : '';
@@ -893,14 +929,7 @@ function renderTab() {
     tb.appendChild(tr);
   });
   t.appendChild(tb); wrap.appendChild(t); el.appendChild(wrap);
-  if (tabAtiva==='rejeitado') {
-    const btnApagar = document.createElement('button');
-    btnApagar.textContent = 'Apagar todos os rejeitados';
-    btnApagar.className = 'btn-act rej';
-    btnApagar.style.cssText = 'margin-top:1rem;padding:8px 16px;font-size:13px;';
-    btnApagar.onclick = apagarTodosRejeitados;
-    el.appendChild(btnApagar);
-  }
+
 }
 async function mudarEstado(id, estado) {
   try { await db(`registos?id=eq.${id}`,{method:'PATCH',body:{estado},prefer:'return=minimal',headers:{}}); await carregarGestor(); } catch(e){}
@@ -959,10 +988,19 @@ function renderMonitores(el) {
   monitoresCache.forEach(m=>{
     const nR=registosCache.filter(r=>r.monitor_id===m.id).length;
     const row=document.createElement('div'); row.className='monitor-row';
-    row.innerHTML=`<div><strong style="font-size:14px">${m.nome}</strong><div style="font-size:12px;color:var(--muted);margin-top:2px">PIN: ${m.pin} · ${nR} registo${nR!==1?'s':''} neste mês</div></div><div style="display:flex;gap:6px;"><button class="btn-act edit" onclick="enviarAlertaGestor('${m.id}','${m.nome}')">📣 Alertar</button><button class="btn-act rej" onclick="removerMonitor('${m.id}')">Remover</button></div>`;
+    row.innerHTML=`<div><strong style="font-size:14px">${m.nome}</strong><div style="font-size:12px;color:var(--muted);margin-top:2px">PIN: ${m.pin} · ${nR} registo${nR!==1?'s':''} neste mês</div></div><div style="display:flex;gap:6px;"><button class="btn-act rej" onclick="removerMonitor('${m.id}')">Remover</button></div>`;
     el.appendChild(row);
   });
 }
+async function alertarMonitorRegisto(registoId, nomeMonitor) {
+  const msg = prompt(`Mensagem para ${nomeMonitor}:`);
+  if (!msg || !msg.trim()) return;
+  try {
+    await db(`registos?id=eq.${registoId}`, {method:'PATCH', body:{alerta_gestor:msg.trim(), visto_monitor:false}, prefer:'return=minimal', headers:{}});
+    await carregarGestor();
+  } catch(e) { alert('Erro ao enviar alerta.'); }
+}
+
 let alertaGestorMonitorId = null;
 function enviarAlertaGestor(id, nome) {
   alertaGestorMonitorId = id;
