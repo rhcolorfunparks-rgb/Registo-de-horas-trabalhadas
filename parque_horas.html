@@ -404,6 +404,25 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="modalAlocacaoOverlay">
+  <div class="modal-box">
+    <div class="modal-title">Alocar horário</div>
+    <div class="modal-sub" id="alocacaoNome"></div>
+    <input type="hidden" id="alocacaoDispId">
+    <div class="field-row" style="margin-bottom:10px;">
+      <div class="field"><label>Entrada</label><input type="time" id="alocacaoEntrada"></div>
+      <div class="field"><label>Saída</label><input type="time" id="alocacaoSaida"></div>
+    </div>
+    <div id="alocacaoPreview" style="font-size:13px;color:var(--muted);margin-bottom:12px;min-height:18px;font-weight:500;"></div>
+    <div class="modal-acoes">
+      <button class="btn-confirmar" onclick="confirmarAlocacao()">Confirmar</button>
+      <button class="btn-cancelar" onclick="limparAlocacao()" style="color:var(--red);">Limpar</button>
+      <button class="btn-cancelar" onclick="fecharAlocacao()">Cancelar</button>
+    </div>
+    <div class="msg erro" id="alocacaoErro"></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalAlertaGestorOverlay">
   <div class="modal-box">
     <div class="modal-title">Enviar alerta ao monitor</div>
@@ -1293,6 +1312,7 @@ async function renderDisponibilidades(el) {
   try {
     dispCache = await db(`disponibilidades?semana_inicio=eq.${dataIni}&order=dia.asc,monitor_nome.asc`) || [];
     filtroDispDia = 'todos'; filtroDispPer = 'todos'; filtroDispParque = 'todos';
+    horarioAlocado = {};
     renderDispView(el, inicio, fim);
   } catch(e) { el.innerHTML='<div class="empty">Erro ao carregar disponibilidades.</div>'; }
 }
@@ -1382,6 +1402,91 @@ function aplicarFiltrosDisp() {
   if (container) renderDispTabela(container, datas, dias, inicio);
 }
 
+let horarioAlocado = {}; // dispId -> horario string
+
+function abrirAlocacao(dispId, nomeMonitor, data, periodo) {
+  document.getElementById('alocacaoDispId').value = dispId;
+  document.getElementById('alocacaoNome').textContent = `${nomeMonitor} — ${fmtData(data)} (${periodo})`;
+  document.getElementById('alocacaoEntrada').value = '';
+  document.getElementById('alocacaoSaida').value = '';
+  const atual = horarioAlocado[dispId] || '';
+  if (atual) {
+    const partes = atual.split('–');
+    if (partes.length === 2) {
+      document.getElementById('alocacaoEntrada').value = partes[0].trim();
+      document.getElementById('alocacaoSaida').value = partes[1].trim();
+    }
+  }
+  document.getElementById('alocacaoPreview').textContent = '';
+  document.getElementById('alocacaoErro').textContent = '';
+  document.getElementById('modalAlocacaoOverlay').classList.add('aberto');
+  // Update preview on change
+  const upd = () => {
+    const e = document.getElementById('alocacaoEntrada').value;
+    const s = document.getElementById('alocacaoSaida').value;
+    if (e && s) {
+      const min = calcMin(e, s);
+      document.getElementById('alocacaoPreview').textContent = min > 0 ? `Total: ${minStr(min)}` : 'Saída deve ser após entrada.';
+    }
+  };
+  document.getElementById('alocacaoEntrada').oninput = upd;
+  document.getElementById('alocacaoSaida').oninput = upd;
+}
+
+function fecharAlocacao() {
+  document.getElementById('modalAlocacaoOverlay').classList.remove('aberto');
+}
+
+function confirmarAlocacao() {
+  const dispId = document.getElementById('alocacaoDispId').value;
+  const ent = document.getElementById('alocacaoEntrada').value;
+  const sai = document.getElementById('alocacaoSaida').value;
+  const err = document.getElementById('alocacaoErro');
+  if (!ent || !sai) return err.textContent = 'Indique a entrada e saída.';
+  if (calcMin(ent, sai) <= 0) return err.textContent = 'Saída deve ser após entrada.';
+  horarioAlocado[dispId] = `${ent}–${sai}`;
+  fecharAlocacao();
+  // Re-render table
+  const {inicio} = getProximaSemana();
+  const dias = ['Terça','Quarta','Quinta','Sexta','Sábado','Domingo','Segunda'];
+  const datas = dias.map((_,i)=>{ const d=new Date(inicio); d.setDate(inicio.getDate()+i); return dateToISO(d); });
+  const container = document.getElementById('dispTabelaContainer');
+  if (container) renderDispTabela(container, datas, dias, inicio);
+  // Auto-fill enviar horario field
+  const disp = dispCache.find(d=>d.id===dispId);
+  if (disp) {
+    const inputId = `hor_${disp.monitor_nome.replace(/ /g,'_')}`;
+    const input = document.getElementById(inputId);
+    if (input) {
+      const existing = input.value.trim();
+      const diaFmt = fmtData(disp.dia);
+      const novaEntrada = `${diaFmt} ${horarioAlocado[dispId]}`;
+      input.value = existing ? `${existing}, ${novaEntrada}` : novaEntrada;
+    }
+  }
+}
+
+function limparAlocacao() {
+  const dispId = document.getElementById('alocacaoDispId').value;
+  delete horarioAlocado[dispId];
+  fecharAlocacao();
+  const {inicio} = getProximaSemana();
+  const dias = ['Terça','Quarta','Quinta','Sexta','Sábado','Domingo','Segunda'];
+  const datas = dias.map((_,i)=>{ const d=new Date(inicio); d.setDate(inicio.getDate()+i); return dateToISO(d); });
+  const container = document.getElementById('dispTabelaContainer');
+  if (container) renderDispTabela(container, datas, dias, inicio);
+  // Remove from enviar horario field
+  const disp = dispCache.find(d=>d.id===dispId);
+  if (disp) {
+    const inputId = `hor_${disp.monitor_nome.replace(/ /g,'_')}`;
+    const input = document.getElementById(inputId);
+    if (input) {
+      const diaFmt = fmtData(disp.dia);
+      input.value = input.value.split(',').filter(p=>!p.includes(diaFmt)).join(',').trim().replace(/^,|,$/g,'');
+    }
+  }
+}
+
 function renderDispTabela(container, datas, dias, inicio) {
   container.innerHTML = '';
   // Filter datas based on filtroDispDia
@@ -1429,7 +1534,9 @@ function renderDispTabela(container, datas, dias, inicio) {
         const perLabel = d.periodo==='manha'?'Manhã':d.periodo==='tarde'?'Tarde':'Todo o dia';
         const cor = d.periodo==='manha'?'#FFF9C4':d.periodo==='tarde'?'#BBDEFB':'#C8E6C9';
         const perShort = d.periodo==='manha'?'M':d.periodo==='tarde'?'T':'✓';
-        return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:${cor};" title="${perLabel} · ${d.parque||''}${d.observacoes?' · '+d.observacoes:''}"><span style="font-weight:600;">${perShort}</span></td>`;
+        const alocado = horarioAlocado[d.id] || '';
+        const alocadoHtml = alocado ? `<div style="font-size:10px;color:#27500A;font-weight:600;margin-top:2px;">${alocado}</div>` : `<div style="font-size:10px;color:#aaa;margin-top:2px;">+ alocar</div>`;
+        return `<td style="padding:6px;border:1px solid var(--border);text-align:center;background:${cor};cursor:pointer;" title="${perLabel} · ${d.parque||''}${d.observacoes?' · '+d.observacoes:''}" onclick="abrirAlocacao('${d.id}','${nome}','${data}','${perLabel}')"><span style="font-weight:600;">${perShort}</span>${alocadoHtml}</td>`;
       }).join('')}`;
     tb.appendChild(tr);
   });
