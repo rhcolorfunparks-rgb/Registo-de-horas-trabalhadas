@@ -1105,6 +1105,7 @@ function renderAlertas(el) {
       <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Mensagem enviada</th>
       <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Enviado em</th>
       <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Confirmado em</th>
+      <th style="padding:6px 8px;border-bottom:1px solid var(--border);"></th>
     </tr></thead>`;
     const tb = document.createElement('tbody');
     alertasGestorHist.sort((a,b)=>b.alerta_data_confirmacao?.localeCompare(a.alerta_data_confirmacao)).forEach(r => {
@@ -1713,6 +1714,9 @@ async function carregarHorariosEnviados(elParent) {
           ${confirmado
             ? `<span class="badge badge-ok">✅ ${fmtDateTime(r.alerta_data_confirmacao)}</span>`
             : `<span class="badge badge-pend">Aguarda confirmação</span>`}
+        </td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);text-align:center;">
+          <button onclick="eliminarAlertaHistorico('${r.id}')" style="font-size:11px;padding:2px 8px;cursor:pointer;border-radius:6px;border:1px solid #ccc;background:transparent;color:#A32D2D;">✕</button>
         </td>`;
       tb.appendChild(tr);
     });
@@ -1911,6 +1915,14 @@ async function abrirPerfilMonitor(monitorId, nomeMonitor) {
   } catch(e) {
     document.getElementById('perfilConteudo').innerHTML = '<div class="empty">Erro ao carregar perfil.</div>';
   }
+}
+
+async function eliminarAlertaHistorico(id) {
+  if (!confirm('Eliminar este alerta do histórico?')) return;
+  try {
+    await db(`registos?id=eq.${id}`, {method:'PATCH', body:{alerta_gestor:null, alerta_data_envio:null, alerta_data_confirmacao:null, visto_monitor:true}, prefer:'return=minimal', headers:{}});
+    await carregarGestor();
+  } catch(e) { alert('Erro ao eliminar.'); }
 }
 
 function gerarPinUnico() {
