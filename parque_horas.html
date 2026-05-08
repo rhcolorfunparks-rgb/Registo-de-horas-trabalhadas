@@ -1389,6 +1389,8 @@ async function renderDisponibilidades(el) {
     dispCache = await db(`disponibilidades?semana_inicio=eq.${dataIni}&order=dia.asc,monitor_nome.asc`) || [];
     filtroDispDia = 'todos'; filtroDispPer = 'todos'; filtroDispParque = 'todos';
     horarioAlocado = {};
+    // Reset checkboxes
+    ['fPerManha','fPerTarde','fPerDiaInteiro'].forEach(id=>{ const el=document.getElementById(id); if(el) el.checked=false; });
     renderDispView(el, inicio, fim);
   } catch(e) { el.innerHTML='<div class="empty">Erro ao carregar disponibilidades.</div>'; }
 }
@@ -1419,12 +1421,11 @@ function renderDispView(el, inicio, fim) {
       <option value="todos">Todos os dias</option>
       ${dias.map((d,i)=>`<option value="${datas[i]}">${d}, ${new Date(datas[i]+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'short'})}</option>`).join('')}
     </select>
-    <select id="fDispPer" onchange="aplicarFiltrosDisp()" style="font-size:13px;padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);">
-      <option value="todos">Todos os períodos</option>
-      <option value="manha">Manhã</option>
-      <option value="tarde">Tarde</option>
-      <option value="dia_inteiro">Dia inteiro</option>
-    </select>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);">
+      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="fPerManha" onchange="aplicarFiltrosDisp()" style="accent-color:var(--accent);"> Manhã</label>
+      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="fPerTarde" onchange="aplicarFiltrosDisp()" style="accent-color:var(--accent);"> Tarde</label>
+      <label style="font-size:13px;cursor:pointer;display:flex;align-items:center;gap:4px;"><input type="checkbox" id="fPerDiaInteiro" onchange="aplicarFiltrosDisp()" style="accent-color:var(--accent);"> Dia inteiro</label>
+    </div>
     <select id="fDispParque" onchange="aplicarFiltrosDisp()" style="font-size:13px;padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);">
       <option value="todos">Todos os parques</option>
       <option value="Color Party">Color Party</option>
@@ -1459,7 +1460,12 @@ function renderDispView(el, inicio, fim) {
 
 function aplicarFiltrosDisp() {
   filtroDispDia = document.getElementById('fDispDia').value;
-  filtroDispPer = document.getElementById('fDispPer').value;
+  // Collect selected periods
+  const perSel = [];
+  if (document.getElementById('fPerManha')?.checked) perSel.push('manha');
+  if (document.getElementById('fPerTarde')?.checked) perSel.push('tarde');
+  if (document.getElementById('fPerDiaInteiro')?.checked) perSel.push('dia_inteiro');
+  filtroDispPer = perSel.length ? perSel : 'todos';
   filtroDispParque = document.getElementById('fDispParque').value;
   const {inicio} = getProximaSemana();
   const dias = ['Terça','Quarta','Quinta','Sexta','Sábado','Domingo','Segunda'];
@@ -1594,7 +1600,14 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
   // Filter disps
   let dispFiltradas = dispCache;
   if (filtroDispDia !== 'todos') dispFiltradas = dispFiltradas.filter(d=>d.dia===filtroDispDia);
-  if (filtroDispPer !== 'todos') dispFiltradas = dispFiltradas.filter(d=>d.periodo===filtroDispPer || (filtroDispPer==='dia_inteiro'&&d.periodo==='dia_inteiro'));
+  if (filtroDispPer !== 'todos') {
+    dispFiltradas = dispFiltradas.filter(d => {
+      const periodos = Array.isArray(filtroDispPer) ? filtroDispPer : [filtroDispPer];
+      // dia_inteiro matches both manha and tarde if selected
+      if (d.periodo === 'dia_inteiro') return periodos.includes('dia_inteiro') || periodos.includes('manha') || periodos.includes('tarde');
+      return periodos.includes(d.periodo);
+    });
+  }
   if (filtroDispParque !== 'todos') dispFiltradas = dispFiltradas.filter(d=>d.parque===filtroDispParque||d.parque==='Ambos');
 
   const monitoresVisiveis = [...new Set(dispFiltradas.map(d=>d.monitor_nome))].sort();
