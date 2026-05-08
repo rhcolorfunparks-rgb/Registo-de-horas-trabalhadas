@@ -305,7 +305,6 @@
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;">
       <button class="tab ativo" id="mTabRegisto" onclick="mudarTabMonitor('registo')">Registar horas</button>
       <button class="tab" id="mTabDisp" onclick="mudarTabMonitor('disponibilidade')">Disponibilidade</button>
-      <button class="tab" id="mTabHorario" onclick="mudarTabMonitor('horario')">O meu horário</button>
     </div>
     <div id="mSecaoRegisto">
     <div id="totalFuncaoMonitor" style="display:none;margin-bottom:1rem;"></div>
@@ -332,16 +331,13 @@
         <div class="card-title">Disponibilidades submetidas</div>
         <div id="dispHistorico"><div class="loading">A carregar...</div></div>
       </div>
-    </div>
-
-    <!-- O meu horário section -->
-    <div id="mSecaoHorario" style="display:none;">
-      <div class="card">
-        <div class="card-title">O meu horário</div>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;">Horários atribuídos pelo gestor</p>
-        <div id="mHorarioLista"><div class="loading">A carregar...</div></div>
+      <div class="card" style="margin-top:1rem;">
+        <div class="card-title">A minha disponibilidade — mês atual</div>
+        <div id="mSemaforoMonitor"><div class="loading">A carregar...</div></div>
       </div>
     </div>
+
+
   </div>
 </div>
 
@@ -1179,33 +1175,37 @@ async function confirmarAlertaGestor() {
 let tabMonitorAtiva = 'registo';
 
 async function carregarMeuHorario() {
-  const el = document.getElementById('mHorarioLista');
+  const el = document.getElementById('mSemaforoMonitor');
   if (!el) return;
   try {
-    // Get all registos with alerta_gestor that contain horário
-    const regs = await db(`registos?monitor_id=eq.${monitorAtual.id}&alerta_gestor=like.*Horário*&order=alerta_data_envio.desc&limit=20`) || [];
-    if (!regs.length) {
-      el.innerHTML = '<div class="empty">Sem horários atribuídos ainda.</div>';
-      return;
-    }
-    el.innerHTML = '';
-    regs.forEach(r => {
-      const confirmado = r.alerta_data_confirmacao;
-      const enviado = r.alerta_data_envio ? fmtDateTime(r.alerta_data_envio) : '—';
-      const div = document.createElement('div');
-      div.style.cssText = 'padding:12px 0;border-bottom:1px solid var(--border);';
-      div.innerHTML = `
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
-          <div style="flex:1;">
-            <p style="font-size:14px;font-weight:600;margin:0 0 4px;">📅 ${r.alerta_gestor.replace('📅 ','')}</p>
-            <p style="font-size:11px;color:var(--muted);margin:0;">Enviado em ${enviado}</p>
-          </div>
-          <span class="badge ${confirmado ? 'badge-ok' : 'badge-pend'}">${confirmado ? '✅ Confirmado' : 'Pendente'}</span>
-        </div>`;
-      el.appendChild(div);
+    const agora = new Date();
+    const ano = agora.getFullYear();
+    const mes = String(agora.getMonth()+1).padStart(2,'0');
+    const dataInicio = `${ano}-${mes}-01`;
+    const dataFim = `${ano}-${mes}-31`;
+    const disps = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&dia=gte.${dataInicio}&dia=lte.${dataFim}`) || [];
+    
+    let total = 0;
+    disps.forEach(d => {
+      const dow = new Date(d.dia+'T12:00:00').getDay();
+      if (dow === 0 || dow === 6) total += d.periodo === 'dia_inteiro' ? 2 : 1;
     });
+
+    let semaforo, cor, msg;
+    if (total >= 9) { semaforo='🟢'; cor='#C8E6C9'; msg='Boa disponibilidade — obrigado!'; }
+    else if (total >= 5) { semaforo='🟡'; cor='#FFF9C4'; msg='Disponibilidade média — tenta aumentar nos próximos fins de semana.'; }
+    else { semaforo='🔴'; cor='#FFCDD2'; msg='Pouca disponibilidade — atenção, pode afetar a tua permanência na equipa.'; }
+
+    const nomeMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][agora.getMonth()];
+    el.innerHTML = `
+      <div style="background:${cor};border-radius:var(--radius-sm);padding:1.25rem;text-align:center;">
+        <div style="font-size:48px;margin-bottom:8px;">${semaforo}</div>
+        <div style="font-size:22px;font-weight:700;margin-bottom:4px;">${total} período${total!==1?'s':''} em ${nomeMes}</div>
+        <div style="font-size:13px;color:var(--text);margin-bottom:4px;">${msg}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 &lt;5 · 🟡 5-8 · 🟢 9+ períodos nos fins de semana</div>
+      </div>`;
   } catch(e) {
-    el.innerHTML = '<div class="empty">Erro ao carregar horários.</div>';
+    el.innerHTML = '<div class="empty">Erro ao carregar.</div>';
   }
 }
 
@@ -1213,12 +1213,9 @@ function mudarTabMonitor(tab) {
   tabMonitorAtiva = tab;
   document.getElementById('mTabRegisto').className = 'tab' + (tab==='registo'?' ativo':'');
   document.getElementById('mTabDisp').className = 'tab' + (tab==='disponibilidade'?' ativo':'');
-  document.getElementById('mTabHorario').className = 'tab' + (tab==='horario'?' ativo':'');
   document.getElementById('mSecaoRegisto').style.display = tab==='registo' ? 'block' : 'none';
   document.getElementById('mSecaoDisp').style.display = tab==='disponibilidade' ? 'block' : 'none';
-  document.getElementById('mSecaoHorario').style.display = tab==='horario' ? 'block' : 'none';
-  if (tab==='disponibilidade') iniciarDisponibilidade();
-  if (tab==='horario') carregarMeuHorario();
+  if (tab==='disponibilidade') { iniciarDisponibilidade(); carregarMeuHorario(); }
 }
 
 function getProximaSemana() {
@@ -1319,11 +1316,7 @@ async function submeterDisponibilidade() {
     registos.push({monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, semana_inicio:dateToISO(inicio), dia:dataISO, periodo:per, parque, observacoes:obs});
   });
 
-  if (!registos.length) {
-    document.getElementById('dispMsg').style.color='var(--red)';
-    document.getElementById('dispMsg').textContent='Selecione pelo menos um dia.';
-    return;
-  }
+  // Allow submitting with zero days (means no availability this week)
 
   try {
     await Promise.all(registos.map(r => db('disponibilidades', {method:'POST', body:r})));
@@ -1431,28 +1424,12 @@ function renderDispView(el, inicio, fim) {
     <span><span style="background:#f5f5f5;padding:2px 8px;border-radius:4px;color:#ccc;">—</span> Indisponível</span>`;
   el.appendChild(leg);
 
-  // Enviar horários
-  const porMonitor = {};
-  dispCache.forEach(d => { if(!porMonitor[d.monitor_nome]) porMonitor[d.monitor_nome]=[]; porMonitor[d.monitor_nome].push(d); });
-  const enviarDiv = document.createElement('div');
-  enviarDiv.style.cssText='margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);';
-  const nomes = Object.keys(porMonitor).sort();
-  enviarDiv.innerHTML=`<p style="font-size:14px;font-weight:600;margin:0 0 8px;">Enviar horário aos monitores</p>
-    <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Escreva o horário de cada monitor e envie como notificação na app.</p>
-    ${nomes.map(nome=>`
-      <div style="margin-bottom:10px;">
-        <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;">${nome}</label>
-        <input type="text" id="hor_${nome.replace(/ /g,'_')}" placeholder="Ex: Ter 10h-14h Color Party, Qui 15h-19h Yupi Color..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);box-sizing:border-box;">
-      </div>`).join('')}
-    <button onclick="enviarHorarios([${nomes.map(n=>`'${n}'`).join(',')}])" style="width:100%;margin-top:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Enviar horários</button>
-    <p id="enviarHorMsg" style="font-size:13px;text-align:center;margin-top:8px;min-height:18px;"></p>
-    <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);">
-      <p style="font-size:14px;font-weight:600;margin:0 0 8px;">Horários enviados — estado</p>
-      <div id="horariosEnviadosLista"><div class="loading">A carregar...</div></div>
-    </div>`;
-  // Load sent horarios status
-  carregarHorariosEnviados(el);
-  el.appendChild(enviarDiv);
+  // Semáforo de disponibilidade
+  const semaforoDiv = document.createElement('div');
+  semaforoDiv.style.cssText = 'margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);';
+  semaforoDiv.innerHTML = '<p style="font-size:14px;font-weight:600;margin:0 0 8px;">Semáforo de disponibilidade — mês atual</p><div id="semaforoLista"><div class="loading">A carregar...</div></div>';
+  el.appendChild(semaforoDiv);
+  carregarSemaforo(document.getElementById('semaforoLista'));
 }
 
 function aplicarFiltrosDisp() {
@@ -1704,6 +1681,68 @@ async function carregarHorariosEnviados(elParent) {
     el.innerHTML='';
     el.appendChild(t);
   } catch(e) { el.innerHTML='<div class="empty">Erro ao carregar.</div>'; }
+}
+
+async function carregarSemaforo(el) {
+  if (!el) return;
+  try {
+    // Get current month's weekend disponibilidades
+    const agora = new Date();
+    const ano = agora.getFullYear();
+    const mes = String(agora.getMonth()+1).padStart(2,'0');
+    const dataInicio = `${ano}-${mes}-01`;
+    const dataFim = `${ano}-${mes}-31`;
+
+    // Get all disponibilidades for this month
+    const disps = await db(`disponibilidades?dia=gte.${dataInicio}&dia=lte.${dataFim}&order=monitor_nome.asc`) || [];
+    const monitores = await db('monitores?equipa=eq.monitores&order=nome.asc') || [];
+
+    // Count weekend periods per monitor
+    const periodosPorMonitor = {};
+    monitores.forEach(m => periodosPorMonitor[m.nome] = 0);
+
+    disps.forEach(d => {
+      const diaSemana = new Date(d.dia + 'T12:00:00').getDay(); // 0=dom, 6=sab
+      if (diaSemana === 0 || diaSemana === 6) { // weekend only
+        const periodos = d.periodo === 'dia_inteiro' ? 2 : 1;
+        if (periodosPorMonitor[d.monitor_nome] !== undefined) {
+          periodosPorMonitor[d.monitor_nome] += periodos;
+        } else {
+          periodosPorMonitor[d.monitor_nome] = periodos;
+        }
+      }
+    });
+
+    function semaforo(n) {
+      if (n >= 9) return {cor:'#C8E6C9', texto:'🟢', label:'Boa disponibilidade'};
+      if (n >= 5) return {cor:'#FFF9C4', texto:'🟡', label:'Disponibilidade média'};
+      return {cor:'#FFCDD2', texto:'🔴', label:'Pouca disponibilidade'};
+    }
+
+    if (!monitores.length) { el.innerHTML = '<div class="empty">Sem monitores.</div>'; return; }
+
+    const t = document.createElement('table');
+    t.style.cssText = 'width:100%;border-collapse:collapse;font-size:13px;';
+    t.innerHTML = `<thead><tr>
+      <th style="text-align:left;padding:7px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Monitor</th>
+      <th style="text-align:center;padding:7px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Períodos fim de semana</th>
+      <th style="text-align:center;padding:7px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Estado</th>
+    </tr></thead>`;
+    const tb = document.createElement('tbody');
+    Object.entries(periodosPorMonitor).sort((a,b)=>a[1]-b[1]).forEach(([nome, n]) => {
+      const s = semaforo(n);
+      const tr = document.createElement('tr');
+      tr.style.background = s.cor + '44';
+      tr.innerHTML = `
+        <td style="padding:8px;border-bottom:1px solid var(--border);font-weight:500;">${nome}</td>
+        <td style="padding:8px;border-bottom:1px solid var(--border);text-align:center;font-weight:600;">${n}</td>
+        <td style="padding:8px;border-bottom:1px solid var(--border);text-align:center;">${s.texto} <span style="font-size:12px;color:var(--muted);">${s.label}</span></td>`;
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    el.innerHTML = `<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">🔴 &lt;5 períodos &nbsp; 🟡 5-8 períodos &nbsp; 🟢 9+ períodos &nbsp;·&nbsp; Dia inteiro = 2 períodos</p>`;
+    el.appendChild(t);
+  } catch(e) { el.innerHTML = '<div class="empty">Erro ao carregar semáforo.</div>'; }
 }
 
 function gerarPinUnico() {
