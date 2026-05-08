@@ -613,7 +613,7 @@ function mostrarProximoAlerta() {
 async function tomarConhecimentoAlerta() {
   const r = alertasQueue[alertaAtualIdx];
   try {
-    await db(`registos?id=eq.${r.id}`, {method:'PATCH', body:{visto_monitor:true}, prefer:'return=minimal', headers:{}});
+    await db(`registos?id=eq.${r.id}`, {method:'PATCH', body:{visto_monitor:true, alerta_data_confirmacao:new Date().toISOString()}, prefer:'return=minimal', headers:{}});
   } catch(e) {}
   document.getElementById('modalAlertaMonitorOverlay').classList.remove('aberto');
   alertaAtualIdx++;
@@ -950,28 +950,97 @@ async function apagarTodosRejeitados() {
     await carregarGestor();
   } catch(e){}
 }
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('pt-PT') + ' ' + d.toTimeString().slice(0,5);
+}
+
 function renderAlertas(el) {
-  const alertas = registosCache.filter(r=>r.alerta);
-  if (!alertas.length) {
-    el.innerHTML = '<div class="empty">Sem alertas de erro pendentes.</div>';
+  // Section 1: Monitor error reports (alerta field)
+  const erros = registosCache.filter(r=>r.alerta);
+  
+  // Section 2: Gestor alerts - pending (sent but not confirmed)
+  const alertasGestorPend = registosCache.filter(r=>r.alerta_gestor && !r.visto_monitor);
+  
+  // Section 3: Gestor alerts - history (confirmed by monitor)
+  const alertasGestorHist = registosCache.filter(r=>r.alerta_gestor && r.visto_monitor && r.alerta_data_confirmacao);
+
+  if (!erros.length && !alertasGestorPend.length && !alertasGestorHist.length) {
+    el.innerHTML = '<div class="empty">Sem alertas pendentes.</div>';
     return;
   }
-  alertas.forEach(r => {
-    const div = document.createElement('div');
-    div.style.cssText = 'padding:12px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;';
-    div.innerHTML = `
-      <div>
+
+  // Monitor error reports
+  if (erros.length) {
+    const h = document.createElement('p');
+    h.style.cssText = 'font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin:12px 0 8px;';
+    h.textContent = 'Erros reportados pelos monitores';
+    el.appendChild(h);
+    erros.forEach(r => {
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:12px 0;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;';
+      div.innerHTML = `
+        <div>
+          <p style="font-size:14px;font-weight:600;margin:0 0 2px;">${r.monitor_nome} · ${fmtData(r.data)}</p>
+          <p style="font-size:13px;color:var(--muted);margin:0 0 4px;">${r.entrada||'—'} → ${r.saida||'—'}</p>
+          <p style="font-size:13px;color:#A32D2D;margin:0;">⚠️ ${r.alerta}</p>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="btn-act edit" onclick="abrirModal('${r.id}')">Editar e corrigir</button>
+          <button class="btn-act apr" onclick="resolverAlerta('${r.id}')">Marcar resolvido</button>
+        </div>`;
+      el.appendChild(div);
+    });
+  }
+
+  // Pending gestor alerts
+  if (alertasGestorPend.length) {
+    const h = document.createElement('p');
+    h.style.cssText = 'font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin:16px 0 8px;';
+    h.textContent = 'Alertas enviados — aguarda confirmação do monitor';
+    el.appendChild(h);
+    alertasGestorPend.forEach(r => {
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:10px 0;border-bottom:1px solid var(--border);';
+      div.innerHTML = `
         <p style="font-size:14px;font-weight:600;margin:0 0 2px;">${r.monitor_nome} · ${fmtData(r.data)}</p>
-        <p style="font-size:13px;color:var(--muted);margin:0 0 4px;">${r.entrada||'—'} → ${r.saida||'—'}</p>
-        <p style="font-size:13px;color:#A32D2D;margin:0;">⚠️ ${r.alerta}</p>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="btn-act edit" onclick="abrirModal('${r.id}')">Editar e corrigir</button>
-        <button class="btn-act apr" onclick="resolverAlerta('${r.id}')">Marcar resolvido</button>
-      </div>`;
-    // Mark as seen by gestor (keep alerta but note gestor viewed it)
-    el.appendChild(div);
-  });
+        <p style="font-size:13px;color:var(--muted);margin:0 0 2px;">📣 ${r.alerta_gestor}</p>
+        <p style="font-size:11px;color:var(--muted);margin:0;">Enviado: ${fmtDateTime(r.alerta_data_envio)} · <span style="color:#BA7517;">A aguardar confirmação</span></p>`;
+      el.appendChild(div);
+    });
+  }
+
+  // History of confirmed alerts
+  if (alertasGestorHist.length) {
+    const h = document.createElement('p');
+    h.style.cssText = 'font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin:16px 0 8px;';
+    h.textContent = 'Histórico de alertas confirmados';
+    el.appendChild(h);
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'overflow-x:auto;';
+    const t = document.createElement('table');
+    t.style.cssText = 'width:100%;font-size:12px;border-collapse:collapse;';
+    t.innerHTML = `<thead><tr>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Monitor</th>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Registo</th>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Mensagem enviada</th>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Enviado em</th>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Confirmado em</th>
+    </tr></thead>`;
+    const tb = document.createElement('tbody');
+    alertasGestorHist.sort((a,b)=>b.alerta_data_confirmacao?.localeCompare(a.alerta_data_confirmacao)).forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);font-weight:500;">${r.monitor_nome}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--muted);">${fmtData(r.data)}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);">${r.alerta_gestor}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--muted);">${fmtDateTime(r.alerta_data_envio)}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:#27500A;font-weight:500;">✅ ${fmtDateTime(r.alerta_data_confirmacao)}</td>`;
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); wrap.appendChild(t); el.appendChild(wrap);
+  }
 }
 
 async function resolverAlerta(id) {
@@ -999,7 +1068,7 @@ async function alertarMonitorRegisto(registoId, nomeMonitor) {
   const msg = prompt(`Mensagem para ${nomeMonitor}:`);
   if (!msg || !msg.trim()) return;
   try {
-    await db(`registos?id=eq.${registoId}`, {method:'PATCH', body:{alerta_gestor:msg.trim(), visto_monitor:false}, prefer:'return=minimal', headers:{}});
+    await db(`registos?id=eq.${registoId}`, {method:'PATCH', body:{alerta_gestor:msg.trim(), visto_monitor:false, alerta_data_envio:new Date().toISOString(), alerta_data_confirmacao:null}, prefer:'return=minimal', headers:{}});
     await carregarGestor();
   } catch(e) { alert('Erro ao enviar alerta.'); }
 }
