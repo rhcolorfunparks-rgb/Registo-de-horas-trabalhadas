@@ -329,7 +329,7 @@
         <div id="dispHistorico"><div class="loading">A carregar...</div></div>
       </div>
       <div class="card" style="margin-top:1rem;">
-        <div class="card-title">A minha disponibilidade — mês atual</div>
+        <div class="card-title">A minha disponibilidade — últimas 4 semanas</div>
         <div id="mSemaforoMonitor"><div class="loading">A carregar...</div></div>
       </div>
     </div>
@@ -1176,13 +1176,15 @@ async function carregarMeuHorario() {
   if (!el) return;
   try {
     const agora = new Date();
-    const ano = agora.getFullYear();
-    const mes = String(agora.getMonth()+1).padStart(2,'0');
-    const dataInicio = `${ano}-${mes}-01`;
-    const dataFim = `${ano}-${mes}-31`;
+    // Use last 4 weeks (28 days) to cover cross-month situations
+    const dataFimDate = new Date(agora);
+    const dataInicioDate = new Date(agora);
+    dataInicioDate.setDate(agora.getDate() - 28);
+    const dataInicio = dateToISO(dataInicioDate);
+    const dataFim = dateToISO(dataFimDate);
     const [disps, regsAprov] = await Promise.all([
       db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&dia=gte.${dataInicio}&dia=lte.${dataFim}`) || [],
-      db(`registos?monitor_id=eq.${monitorAtual.id}&data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado`) || []
+      db(`registos?monitor_id=eq.${monitorAtual.id}&data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&select=data,entrada,saida`) || []
     ]);
 
     let total = 0;
@@ -1222,7 +1224,7 @@ async function carregarMeuHorario() {
         <div style="font-size:48px;margin-bottom:8px;">${semaforo}</div>
         <div style="font-size:22px;font-weight:700;margin-bottom:4px;">${total} período${total!==1?'s':''} em ${nomeMes}</div>
         <div style="font-size:13px;color:var(--text);margin-bottom:4px;">${msg}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 &lt;5 · 🟡 5-8 · 🟢 9+ períodos nos fins de semana</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 &lt;5 · 🟡 5-8 · 🟢 9+ períodos nos fins de semana (últimas 4 semanas)</div>
       </div>`;
   } catch(e) {
     el.innerHTML = '<div class="empty">Erro ao carregar.</div>';
@@ -1449,7 +1451,7 @@ function renderDispView(el, inicio, fim) {
   // Semáforo de disponibilidade
   const semaforoDiv = document.createElement('div');
   semaforoDiv.style.cssText = 'margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);';
-  semaforoDiv.innerHTML = '<p style="font-size:14px;font-weight:600;margin:0 0 8px;">Semáforo de disponibilidade — mês atual</p><div id="semaforoLista"><div class="loading">A carregar...</div></div>';
+  semaforoDiv.innerHTML = '<p style="font-size:14px;font-weight:600;margin:0 0 8px;">Semáforo de disponibilidade — últimas 4 semanas</p><div id="semaforoLista"><div class="loading">A carregar...</div></div>';
   el.appendChild(semaforoDiv);
   carregarSemaforo(document.getElementById('semaforoLista'));
 }
@@ -1711,15 +1713,17 @@ async function carregarSemaforo(el) {
   try {
     // Get current month's weekend disponibilidades
     const agora = new Date();
-    const ano = agora.getFullYear();
-    const mes = String(agora.getMonth()+1).padStart(2,'0');
-    const dataInicio = `${ano}-${mes}-01`;
-    const dataFim = `${ano}-${mes}-31`;
+    // Use last 4 weeks (28 days) to cover cross-month situations
+    const dataFimDate = new Date(agora);
+    const dataInicioDate = new Date(agora);
+    dataInicioDate.setDate(agora.getDate() - 28);
+    const dataInicio = dateToISO(dataInicioDate);
+    const dataFim = dateToISO(dataFimDate);
 
-    // Get all disponibilidades and approved registos for this month
+    // Get all disponibilidades and approved registos for last 4 weeks
     const [disps, registos, monitores] = await Promise.all([
       db(`disponibilidades?dia=gte.${dataInicio}&dia=lte.${dataFim}&order=monitor_nome.asc`) || [],
-      db(`registos?data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&equipa=eq.monitores`) || [],
+      db(`registos?data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&or=(equipa.eq.monitores,equipa.is.null)&select=monitor_nome,data,entrada,saida`) || [],
       db('monitores?equipa=eq.monitores&order=nome.asc') || []
     ]);
 
