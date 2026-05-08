@@ -1589,10 +1589,12 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
   const tb = document.createElement('tbody');
   monitoresVisiveis.forEach(nome => {
     const dispMonitor = dispCache.filter(d=>d.monitor_nome===nome);
+    const dispMonitorFiltrado = dispFiltradas.filter(d=>d.monitor_nome===nome);
     const tr = document.createElement('tr');
-    // Get parque and obs from first available entry
-    const primeiroDisp = dispMonitor[0];
-    const parques = [...new Set(dispMonitor.map(d=>d.parque).filter(Boolean))].join(', ');
+    // Show parque for the specific filtered day, or all unique parques if no day filter
+    const parques = filtroDispDia !== 'todos'
+      ? (dispMonitorFiltrado[0]?.parque || '—')
+      : [...new Set(dispMonitor.map(d=>d.parque).filter(Boolean))].join(', ');
     const obsAll = [...new Set(dispMonitor.map(d=>d.observacoes).filter(Boolean))].join('; ');
     tr.innerHTML=`
       <td style="padding:8px;border:1px solid var(--border);font-weight:500;">${nome}</td>
