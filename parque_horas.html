@@ -407,6 +407,16 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="modalPerfilOverlay" style="align-items:flex-start;padding-top:2rem;">
+  <div class="modal-box" style="max-width:520px;width:100%;max-height:85vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
+      <div class="modal-title" id="perfilNome" style="margin:0;"></div>
+      <button onclick="fecharPerfil()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--muted);">✕</button>
+    </div>
+    <div id="perfilConteudo"><div class="loading">A carregar...</div></div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalAlocacaoOverlay">
   <div class="modal-box">
     <div class="modal-title">Alocar horário</div>
@@ -1128,7 +1138,7 @@ function renderMonitores(el) {
   monitoresCache.forEach(m=>{
     const nR=registosCache.filter(r=>r.monitor_id===m.id).length;
     const row=document.createElement('div'); row.className='monitor-row';
-    row.innerHTML=`<div><strong style="font-size:14px">${m.nome}</strong><div style="font-size:12px;color:var(--muted);margin-top:2px">PIN: ${m.pin} · ${nR} registo${nR!==1?'s':''} neste mês</div></div><div style="display:flex;gap:6px;"><button class="btn-act rej" onclick="removerMonitor('${m.id}')">Remover</button></div>`;
+    row.innerHTML=`<div style="cursor:pointer;" onclick="abrirPerfilMonitor('${m.id}','${m.nome.replace(/'/g,"\'")}')"><strong style="font-size:14px">${m.nome}</strong><div style="font-size:12px;color:var(--muted);margin-top:2px">PIN: ${m.pin} · ${nR} registo${nR!==1?'s':''} neste mês</div></div><div style="display:flex;gap:6px;"><button class="btn-act edit" onclick="event.stopPropagation();abrirPerfilMonitor('${m.id}','${m.nome.replace(/'/g,"\'")}')">Ver perfil</button><button class="btn-act rej" onclick="event.stopPropagation();removerMonitor('${m.id}')">Remover</button></div>`;
     el.appendChild(row);
   });
 }
@@ -1793,6 +1803,97 @@ async function guardarObsDisp(input, nomeMonitor, semanaInicio) {
       disps.forEach(d => d.observacoes = obs);
     }
   } catch(e) { console.error('Erro ao guardar observação:', e); }
+}
+
+function fecharPerfil() {
+  document.getElementById('modalPerfilOverlay').classList.remove('aberto');
+}
+
+async function abrirPerfilMonitor(monitorId, nomeMonitor) {
+  document.getElementById('perfilNome').textContent = nomeMonitor;
+  document.getElementById('perfilConteudo').innerHTML = '<div class="loading">A carregar...</div>';
+  document.getElementById('modalPerfilOverlay').classList.add('aberto');
+
+  try {
+    const agora = new Date();
+    const nomeMeses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+    // Load last 3 months of data
+    const meses = [];
+    for (let i = 0; i < 3; i++) {
+      const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
+      meses.push({
+        ano: d.getFullYear(),
+        mes: d.getMonth(),
+        nome: nomeMeses[d.getMonth()],
+        inicio: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`,
+        fim: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-31`
+      });
+    }
+
+    // Fetch all approved registos for this monitor
+    const regs = await db(`registos?monitor_id=eq.${monitorId}&estado=eq.aprovado&order=data.desc`) || [];
+
+    // Semaforo - last 4 weeks
+    const dataFimSem = dateToISO(agora);
+    const dataInicioSem = new Date(agora); dataInicioSem.setDate(agora.getDate()-28);
+    const dataInicioSemStr = dateToISO(dataInicioSem);
+    let periodosFdS = 0;
+    const jaContadosSem = new Set();
+    regs.filter(r=>r.data>=dataInicioSemStr&&r.data<=dataFimSem).forEach(r=>{
+      const dow = new Date(r.data+'T12:00:00').getDay();
+      if ((dow===0||dow===6) && !jaContadosSem.has(r.data)) {
+        jaContadosSem.add(r.data);
+        const h = parseInt(r.entrada.split(':')[0]);
+        const s = parseInt(r.saida.split(':')[0]);
+        let p=0; if(h<13)p++; if(s>13)p++;
+        periodosFdS += p||1;
+      }
+    });
+    const sem = periodosFdS>=9?{emoji:'🟢',label:'Boa disponibilidade',cor:'#C8E6C9'}:
+                periodosFdS>=5?{emoji:'🟡',label:'Disponibilidade média',cor:'#FFF9C4'}:
+                {emoji:'🔴',label:'Pouca disponibilidade',cor:'#FFCDD2'};
+
+    // Build HTML
+    let html = `
+      <div style="background:${sem.cor};border-radius:var(--radius-sm);padding:12px;display:flex;align-items:center;gap:12px;margin-bottom:1.5rem;">
+        <span style="font-size:32px;">${sem.emoji}</span>
+        <div>
+          <div style="font-weight:600;font-size:14px;">${sem.label}</div>
+          <div style="font-size:12px;color:var(--muted);">${periodosFdS} período${periodosFdS!==1?'s':''} em fins de semana (últimas 4 semanas)</div>
+        </div>
+      </div>`;
+
+    // Hours per month
+    html += `<p style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Horas aprovadas por mês</p>`;
+    meses.forEach(m => {
+      const regsM = regs.filter(r=>r.data>=m.inicio&&r.data<=m.fim);
+      const minsPorFuncao = {};
+      regsM.forEach(r=>{
+        if(!r.entrada||!r.saida) return;
+        const f = r.funcao||'—';
+        const bruto = calcMin(r.entrada,r.saida);
+        const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+        minsPorFuncao[f] = (minsPorFuncao[f]||0)+Math.max(bruto-pausa,0);
+      });
+      const totalMins = Object.values(minsPorFuncao).reduce((a,b)=>a+b,0);
+      html += `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${Object.keys(minsPorFuncao).length?'8px':'0'};">
+          <span style="font-weight:600;font-size:13px;">${m.nome} ${m.ano}</span>
+          <span style="font-size:13px;font-weight:600;">${Math.floor(totalMins/60)}h ${totalMins%60}min</span>
+        </div>
+        ${Object.entries(minsPorFuncao).map(([f,min])=>`
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:2px 0;">
+            <span>${f}</span><span>${Math.floor(min/60)}h ${min%60}min</span>
+          </div>`).join('')}
+        ${!totalMins?'<div style="font-size:12px;color:var(--muted);">Sem registos aprovados</div>':''}
+      </div>`;
+    });
+
+    document.getElementById('perfilConteudo').innerHTML = html;
+  } catch(e) {
+    document.getElementById('perfilConteudo').innerHTML = '<div class="empty">Erro ao carregar perfil.</div>';
+  }
 }
 
 function gerarPinUnico() {
