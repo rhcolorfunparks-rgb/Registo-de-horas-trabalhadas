@@ -1869,14 +1869,28 @@ async function abrirPerfilMonitor(monitorId, nomeMonitor) {
       const totalMins = Object.values(minsPorFuncao).reduce((a,b)=>a+b,0);
       if (!totalMins) return; // skip months with no records
       html += `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${Object.keys(minsPorFuncao).length?'8px':'0'};">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
           <span style="font-weight:600;font-size:13px;">${m.nome} ${m.ano}</span>
           <span style="font-size:13px;font-weight:600;">${Math.floor(totalMins/60)}h ${totalMins%60}min</span>
         </div>
         ${Object.entries(minsPorFuncao).map(([f,min])=>`
-          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:2px 0;">
-            <span>${f}</span><span>${Math.floor(min/60)}h ${min%60}min</span>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:2px 0;border-bottom:0.5px solid var(--border);">
+            <span style="font-weight:500;">${f}</span><span>${Math.floor(min/60)}h ${min%60}min</span>
           </div>`).join('')}
+        <div style="margin-top:8px;">
+          ${regsM.map(r=>{
+            const bruto = calcMin(r.entrada,r.saida);
+            const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+            const liq = Math.max(bruto-pausa,0);
+            const dow = new Date(r.data+'T12:00:00').getDay();
+            const fds = (dow===0||dow===6) ? ' 🏖️' : '';
+            return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px;padding:4px 0;border-bottom:0.5px solid var(--border);">
+              <span style="color:var(--muted);">${fmtData(r.data)}${fds}</span>
+              <span>${r.funcao||'—'} · ${r.parque||'—'}</span>
+              <span style="font-weight:500;">${Math.floor(liq/60)}h ${liq%60}min</span>
+            </div>`;
+          }).join('')}
+        </div>
       </div>`;
     });
 
