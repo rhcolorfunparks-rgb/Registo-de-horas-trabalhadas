@@ -1180,12 +1180,35 @@ async function carregarMeuHorario() {
     const mes = String(agora.getMonth()+1).padStart(2,'0');
     const dataInicio = `${ano}-${mes}-01`;
     const dataFim = `${ano}-${mes}-31`;
-    const disps = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&dia=gte.${dataInicio}&dia=lte.${dataFim}`) || [];
-    
+    const [disps, regsAprov] = await Promise.all([
+      db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&dia=gte.${dataInicio}&dia=lte.${dataFim}`) || [],
+      db(`registos?monitor_id=eq.${monitorAtual.id}&data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado`) || []
+    ]);
+
     let total = 0;
+    const jaContados = new Set();
+
     disps.forEach(d => {
       const dow = new Date(d.dia+'T12:00:00').getDay();
-      if (dow === 0 || dow === 6) total += d.periodo === 'dia_inteiro' ? 2 : 1;
+      if (dow === 0 || dow === 6) {
+        total += d.periodo === 'dia_inteiro' ? 2 : 1;
+        jaContados.add(d.dia);
+      }
+    });
+
+    // Add approved registos on weekends not already counted
+    regsAprov.forEach(r => {
+      if (!r.data || !r.entrada || !r.saida) return;
+      const dow = new Date(r.data+'T12:00:00').getDay();
+      if ((dow === 0 || dow === 6) && !jaContados.has(r.data)) {
+        jaContados.add(r.data);
+        const horaEntrada = parseInt(r.entrada.split(':')[0]);
+        const horaSaida = parseInt(r.saida.split(':')[0]);
+        let p = 0;
+        if (horaEntrada < 13) p++;
+        if (horaSaida > 13) p++;
+        total += p || 1;
+      }
     });
 
     let semaforo, cor, msg;
@@ -1238,6 +1261,8 @@ async function iniciarDisponibilidade() {
   const {inicio, fim} = getProximaSemana();
   const semanaStr = `${fmtDataSimples(inicio)} a ${fmtDataSimples(fim)}`;
   document.getElementById('dispSemanaInfo').textContent = `Semana de ${semanaStr}`;
+  // Clear form first to prevent browser cache from previous monitor
+  document.getElementById('dispDias').innerHTML = '<div class="loading">A carregar...</div>';
 
   // Check if already submitted
   const existentes = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicio)}&order=dia.asc`) || [];
@@ -1691,23 +1716,49 @@ async function carregarSemaforo(el) {
     const dataInicio = `${ano}-${mes}-01`;
     const dataFim = `${ano}-${mes}-31`;
 
-    // Get all disponibilidades for this month
-    const disps = await db(`disponibilidades?dia=gte.${dataInicio}&dia=lte.${dataFim}&order=monitor_nome.asc`) || [];
-    const monitores = await db('monitores?equipa=eq.monitores&order=nome.asc') || [];
+    // Get all disponibilidades and approved registos for this month
+    const [disps, registos, monitores] = await Promise.all([
+      db(`disponibilidades?dia=gte.${dataInicio}&dia=lte.${dataFim}&order=monitor_nome.asc`) || [],
+      db(`registos?data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&equipa=eq.monitores`) || [],
+      db('monitores?equipa=eq.monitores&order=nome.asc') || []
+    ]);
 
     // Count weekend periods per monitor
     const periodosPorMonitor = {};
     monitores.forEach(m => periodosPorMonitor[m.nome] = 0);
 
+    // Count from disponibilidades
     disps.forEach(d => {
-      const diaSemana = new Date(d.dia + 'T12:00:00').getDay(); // 0=dom, 6=sab
-      if (diaSemana === 0 || diaSemana === 6) { // weekend only
+      const diaSemana = new Date(d.dia + 'T12:00:00').getDay();
+      if (diaSemana === 0 || diaSemana === 6) {
         const periodos = d.periodo === 'dia_inteiro' ? 2 : 1;
         if (periodosPorMonitor[d.monitor_nome] !== undefined) {
           periodosPorMonitor[d.monitor_nome] += periodos;
         } else {
           periodosPorMonitor[d.monitor_nome] = periodos;
         }
+      }
+    });
+
+    // Also count from approved registos on weekends (to cover weeks before app was used)
+    // Track which monitor+day combos already counted via disponibilidades to avoid double counting
+    const jaContados = new Set(disps.map(d => `${d.monitor_nome}_${d.dia}`));
+    registos.forEach(r => {
+      if (!r.data || !r.entrada || !r.saida) return;
+      const diaSemana = new Date(r.data + 'T12:00:00').getDay();
+      if (diaSemana !== 0 && diaSemana !== 6) return; // weekend only
+      const chave = `${r.monitor_nome}_${r.data}`;
+      if (jaContados.has(chave)) return; // already counted via disponibilidades
+      jaContados.add(chave);
+      // Estimate period from hours
+      const horaEntrada = parseInt(r.entrada.split(':')[0]);
+      const horaSaida = parseInt(r.saida.split(':')[0]);
+      let periodos = 0;
+      if (horaEntrada < 13) periodos++; // morning shift
+      if (horaSaida > 13) periodos++;   // afternoon shift
+      if (periodos === 0) periodos = 1;  // at least 1
+      if (periodosPorMonitor[r.monitor_nome] !== undefined) {
+        periodosPorMonitor[r.monitor_nome] += periodos;
       }
     });
 
