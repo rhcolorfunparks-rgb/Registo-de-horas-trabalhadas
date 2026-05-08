@@ -1807,7 +1807,7 @@ async function abrirPerfilMonitor(monitorId, nomeMonitor) {
     const agora = new Date();
     const nomeMeses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-    // Load last 3 months of data
+    // Load last 3 months, only show months with records
     const meses = [];
     for (let i = 0; i < 3; i++) {
       const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
@@ -1867,6 +1867,7 @@ async function abrirPerfilMonitor(monitorId, nomeMonitor) {
         minsPorFuncao[f] = (minsPorFuncao[f]||0)+Math.max(bruto-pausa,0);
       });
       const totalMins = Object.values(minsPorFuncao).reduce((a,b)=>a+b,0);
+      if (!totalMins) return; // skip months with no records
       html += `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:${Object.keys(minsPorFuncao).length?'8px':'0'};">
           <span style="font-weight:600;font-size:13px;">${m.nome} ${m.ano}</span>
@@ -1876,7 +1877,6 @@ async function abrirPerfilMonitor(monitorId, nomeMonitor) {
           <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:2px 0;">
             <span>${f}</span><span>${Math.floor(min/60)}h ${min%60}min</span>
           </div>`).join('')}
-        ${!totalMins?'<div style="font-size:12px;color:var(--muted);">Sem registos aprovados</div>':''}
       </div>`;
     });
 
