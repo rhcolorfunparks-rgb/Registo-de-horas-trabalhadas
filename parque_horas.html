@@ -1194,24 +1194,20 @@ async function carregarMeuHorario() {
     const dataFim = dateToISO(dataFimDate);
     const [disps, regsAprov] = await Promise.all([
       db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&dia=gte.${dataInicio}&dia=lte.${dataFim}`) || [],
-      db(`registos?monitor_id=eq.${monitorAtual.id}&data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&select=data,entrada,saida`) || []
+      db(`registos?monitor_id=eq.${monitorAtual.id}&data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&select=data,entrada,saida,pausa_inicio,pausa_fim`) || []
     ]);
 
     let total = 0;
     const jaContados = new Set();
 
-    // Count only approved registos on weekends
+    // Count only approved registos on weekends - 1 registo = 1 periodo
+    // Exception: if registo has pausa (worked both shifts) = 2 periodos
     regsAprov.forEach(r => {
       if (!r.data || !r.entrada || !r.saida) return;
       const dow = new Date(r.data+'T12:00:00').getDay();
-      if ((dow === 0 || dow === 6) && !jaContados.has(r.data)) {
-        jaContados.add(r.data);
-        const horaEntrada = parseInt(r.entrada.split(':')[0]);
-        const horaSaida = parseInt(r.saida.split(':')[0]);
-        let p = 0;
-        if (horaEntrada < 13) p++;
-        if (horaSaida > 13) p++;
-        total += p || 1;
+      if (dow === 0 || dow === 6) {
+        const periodos = (r.pausa_inicio && r.pausa_fim) ? 2 : 1;
+        total += periodos;
       }
     });
 
@@ -1728,7 +1724,7 @@ async function carregarSemaforo(el) {
     // Get all disponibilidades and approved registos for last 4 weeks
     const [disps, registos, monitores] = await Promise.all([
       db(`disponibilidades?dia=gte.${dataInicio}&dia=lte.${dataFim}&order=monitor_nome.asc`) || [],
-      db(`registos?data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&or=(equipa.eq.monitores,equipa.is.null)&select=monitor_nome,data,entrada,saida`) || [],
+      db(`registos?data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&or=(equipa.eq.monitores,equipa.is.null)&select=monitor_nome,data,entrada,saida,pausa_inicio,pausa_fim`) || [],
       db('monitores?equipa=eq.monitores&order=nome.asc') || []
     ]);
 
@@ -1746,16 +1742,9 @@ async function carregarSemaforo(el) {
       const chave = `${r.monitor_nome}_${r.data}`;
       if (jaContados.has(chave)) return; // already counted via disponibilidades
       jaContados.add(chave);
-      // Estimate period from hours
-      const horaEntrada = parseInt(r.entrada.split(':')[0]);
-      const horaSaida = parseInt(r.saida.split(':')[0]);
-      let periodos = 0;
-      if (horaEntrada < 13) periodos++; // morning shift
-      if (horaSaida > 13) periodos++;   // afternoon shift
-      if (periodos === 0) periodos = 1;  // at least 1
-      if (periodosPorMonitor[r.monitor_nome] !== undefined) {
-        periodosPorMonitor[r.monitor_nome] += periodos;
-      }
+      // 1 registo = 1 periodo; with pausa = 2 periodos (worked both shifts)
+      const periodos = (r.pausa_inicio && r.pausa_fim) ? 2 : 1;
+      periodosPorMonitor[r.monitor_nome] = (periodosPorMonitor[r.monitor_nome] || 0) + periodos;
     });
 
     function semaforo(n) {
@@ -1846,8 +1835,9 @@ async function abrirPerfilMonitor(monitorId, nomeMonitor) {
         jaContadosSem.add(r.data);
         const h = parseInt(r.entrada.split(':')[0]);
         const s = parseInt(r.saida.split(':')[0]);
-        let p=0; if(h<13)p++; if(s>13)p++;
-        periodosFdS += p||1;
+        // 1 registo = 1 periodo; with pausa = 2 periodos
+        const p = (r.pausa_inicio && r.pausa_fim) ? 2 : 1;
+        periodosFdS += p;
       }
     });
     const sem = periodosFdS>=9?{emoji:'🟢',label:'Boa disponibilidade',cor:'#C8E6C9'}:
