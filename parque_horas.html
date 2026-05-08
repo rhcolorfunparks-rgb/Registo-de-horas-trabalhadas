@@ -1437,7 +1437,7 @@ function aplicarFiltrosDisp() {
   const dias = ['Terça','Quarta','Quinta','Sexta','Sábado','Domingo','Segunda'];
   const datas = dias.map((_,i)=>{ const d=new Date(inicio); d.setDate(inicio.getDate()+i); return dateToISO(d); });
   const container = document.getElementById('dispTabelaContainer');
-  if (container) renderDispTabela(container, datas, dias, inicio);
+  if (container) renderDispTabela(container, datas, dias, inicio, dateToISO(inicio));
 }
 
 let horarioAlocado = {}; // dispId -> horario string
@@ -1557,7 +1557,7 @@ function limparAlocacao() {
   }
 }
 
-function renderDispTabela(container, datas, dias, inicio) {
+function renderDispTabela(container, datas, dias, inicio, dataIni) {
   container.innerHTML = '';
   // Filter datas based on filtroDispDia
   const datasVisiveis = filtroDispDia === 'todos' ? datas : datas.filter(d=>d===filtroDispDia);
@@ -1597,18 +1597,17 @@ function renderDispTabela(container, datas, dias, inicio) {
     tr.innerHTML=`
       <td style="padding:8px;border:1px solid var(--border);font-weight:500;">${nome}</td>
       <td style="padding:8px;border:1px solid var(--border);font-size:11px;color:var(--muted);">${parques||'—'}</td>
-      <td style="padding:8px;border:1px solid var(--border);font-size:11px;color:var(--muted);max-width:150px;">${obsAll||'—'}</td>
+      <td style="padding:4px 8px;border:1px solid var(--border);"><input type="text" value="${obsAll||''}" placeholder="Adicionar observação..." onblur="guardarObsDisp(this, '${nome}', '${dataIni}')" style="width:100%;font-size:11px;padding:4px 6px;border:1px solid transparent;border-radius:4px;background:transparent;color:var(--text);" onfocus="this.style.border='1px solid var(--border)';this.style.background='var(--surface)'" onblur="this.style.border='1px solid transparent';this.style.background='transparent';guardarObsDisp(this,'${nome}','${dataIni}')"></td>
       ${datasVisiveis.map(data=>{
         const d = dispMonitor.find(x=>x.dia===data);
         if(!d) return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:#fff5f5;color:#ccc;">—</td>`;
+        // Hide cell if parque filter doesn't match
+        const parqueMatch = filtroDispParque === 'todos' || d.parque === filtroDispParque || d.parque === 'Ambos';
+        if (!parqueMatch) return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:#fff5f5;color:#ccc;">—</td>`;
         const perLabel = d.periodo==='manha'?'Manhã':d.periodo==='tarde'?'Tarde':'Todo o dia';
         const cor = d.periodo==='manha'?'#FFF9C4':d.periodo==='tarde'?'#BBDEFB':'#C8E6C9';
         const perShort = d.periodo==='manha'?'M':d.periodo==='tarde'?'T':'✓';
-        const alocado = horarioAlocado[d.id] || '';
-        const alocadoHtml = alocado
-          ? alocado.split(' | ').map(t=>`<div style="font-size:10px;color:#27500A;font-weight:600;">${t}</div>`).join('')
-          : `<div style="font-size:10px;color:#aaa;margin-top:2px;">+ alocar</div>`;
-        return `<td style="padding:6px;border:1px solid var(--border);text-align:center;background:${cor};cursor:pointer;" title="${perLabel} · ${d.parque||''}${d.observacoes?' · '+d.observacoes:''}" onclick="abrirAlocacao('${d.id}','${nome}','${data}','${perLabel}')"><span style="font-weight:600;">${perShort}</span>${alocadoHtml}</td>`;
+        return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:${cor};" title="${perLabel} · ${d.parque||''}${d.observacoes?' · '+d.observacoes:''}"><span style="font-weight:600;">${perShort}</span></td>`;
       }).join('')}`;
     tb.appendChild(tr);
   });
@@ -1740,6 +1739,21 @@ async function carregarSemaforo(el) {
     el.innerHTML = `<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">🔴 &lt;5 períodos &nbsp; 🟡 5-8 períodos &nbsp; 🟢 9+ períodos &nbsp;·&nbsp; Dia inteiro = 2 períodos</p>`;
     el.appendChild(t);
   } catch(e) { el.innerHTML = '<div class="empty">Erro ao carregar semáforo.</div>'; }
+}
+
+async function guardarObsDisp(input, nomeMonitor, semanaInicio) {
+  const obs = input.value.trim() || null;
+  try {
+    // Update all disponibilidades for this monitor this week with the observation
+    const disps = dispCache.filter(d => d.monitor_nome === nomeMonitor);
+    if (disps.length) {
+      await Promise.all(disps.map(d =>
+        db(`disponibilidades?id=eq.${d.id}`, {method:'PATCH', body:{observacoes: obs}, prefer:'return=minimal', headers:{}})
+      ));
+      // Update local cache
+      disps.forEach(d => d.observacoes = obs);
+    }
+  } catch(e) { console.error('Erro ao guardar observação:', e); }
 }
 
 function gerarPinUnico() {
