@@ -409,9 +409,17 @@
     <div class="modal-title">Alocar horário</div>
     <div class="modal-sub" id="alocacaoNome"></div>
     <input type="hidden" id="alocacaoDispId">
+    <div id="alocacaoLabelTurno1" style="display:none;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">1º Turno (Manhã)</div>
     <div class="field-row" style="margin-bottom:10px;">
       <div class="field"><label>Entrada</label><input type="time" id="alocacaoEntrada"></div>
       <div class="field"><label>Saída</label><input type="time" id="alocacaoSaida"></div>
+    </div>
+    <div id="alocacaoTurno2" style="display:none;">
+      <div style="font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">2º Turno (Tarde) — opcional</div>
+      <div class="field-row" style="margin-bottom:10px;">
+        <div class="field"><label>Entrada</label><input type="time" id="alocacaoEntrada2"></div>
+        <div class="field"><label>Saída</label><input type="time" id="alocacaoSaida2"></div>
+      </div>
     </div>
     <div id="alocacaoPreview" style="font-size:13px;color:var(--muted);margin-bottom:12px;min-height:18px;font-weight:500;"></div>
     <div class="modal-acoes">
@@ -1407,30 +1415,43 @@ let horarioAlocado = {}; // dispId -> horario string
 function abrirAlocacao(dispId, nomeMonitor, data, periodo) {
   document.getElementById('alocacaoDispId').value = dispId;
   document.getElementById('alocacaoNome').textContent = `${nomeMonitor} — ${fmtData(data)} (${periodo})`;
+  const isDiaInteiro = periodo === 'Todo o dia';
+  // Show/hide second shift
+  const turno2 = document.getElementById('alocacaoTurno2');
+  if (turno2) turno2.style.display = isDiaInteiro ? 'block' : 'none';
+  const labelTurno1 = document.getElementById('alocacaoLabelTurno1');
+  if (labelTurno1) labelTurno1.style.display = isDiaInteiro ? 'block' : 'none';
+  // Fill existing values
+  const atual = horarioAlocado[dispId] || '';
   document.getElementById('alocacaoEntrada').value = '';
   document.getElementById('alocacaoSaida').value = '';
-  const atual = horarioAlocado[dispId] || '';
+  document.getElementById('alocacaoEntrada2').value = '';
+  document.getElementById('alocacaoSaida2').value = '';
   if (atual) {
-    const partes = atual.split('–');
-    if (partes.length === 2) {
-      document.getElementById('alocacaoEntrada').value = partes[0].trim();
-      document.getElementById('alocacaoSaida').value = partes[1].trim();
+    const turnos = atual.split(' | ');
+    if (turnos[0]) {
+      const p = turnos[0].split('–');
+      if (p.length===2) { document.getElementById('alocacaoEntrada').value=p[0].trim(); document.getElementById('alocacaoSaida').value=p[1].trim(); }
+    }
+    if (turnos[1]) {
+      const p = turnos[1].split('–');
+      if (p.length===2) { document.getElementById('alocacaoEntrada2').value=p[0].trim(); document.getElementById('alocacaoSaida2').value=p[1].trim(); }
     }
   }
   document.getElementById('alocacaoPreview').textContent = '';
   document.getElementById('alocacaoErro').textContent = '';
   document.getElementById('modalAlocacaoOverlay').classList.add('aberto');
-  // Update preview on change
   const upd = () => {
-    const e = document.getElementById('alocacaoEntrada').value;
-    const s = document.getElementById('alocacaoSaida').value;
-    if (e && s) {
-      const min = calcMin(e, s);
-      document.getElementById('alocacaoPreview').textContent = min > 0 ? `Total: ${minStr(min)}` : 'Saída deve ser após entrada.';
-    }
+    const e1=document.getElementById('alocacaoEntrada').value, s1=document.getElementById('alocacaoSaida').value;
+    const e2=document.getElementById('alocacaoEntrada2').value, s2=document.getElementById('alocacaoSaida2').value;
+    let txt = '';
+    if (e1&&s1&&calcMin(e1,s1)>0) txt += `Turno 1: ${minStr(calcMin(e1,s1))}`;
+    if (e2&&s2&&calcMin(e2,s2)>0) txt += (txt?' · ':'')+`Turno 2: ${minStr(calcMin(e2,s2))}`;
+    document.getElementById('alocacaoPreview').textContent = txt;
   };
-  document.getElementById('alocacaoEntrada').oninput = upd;
-  document.getElementById('alocacaoSaida').oninput = upd;
+  ['alocacaoEntrada','alocacaoSaida','alocacaoEntrada2','alocacaoSaida2'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.oninput=upd;
+  });
 }
 
 function fecharAlocacao() {
@@ -1441,10 +1462,14 @@ function confirmarAlocacao() {
   const dispId = document.getElementById('alocacaoDispId').value;
   const ent = document.getElementById('alocacaoEntrada').value;
   const sai = document.getElementById('alocacaoSaida').value;
+  const ent2 = document.getElementById('alocacaoEntrada2').value;
+  const sai2 = document.getElementById('alocacaoSaida2').value;
   const err = document.getElementById('alocacaoErro');
-  if (!ent || !sai) return err.textContent = 'Indique a entrada e saída.';
+  if (!ent || !sai) return err.textContent = 'Indique pelo menos a entrada e saída do 1º turno.';
   if (calcMin(ent, sai) <= 0) return err.textContent = 'Saída deve ser após entrada.';
-  horarioAlocado[dispId] = `${ent}–${sai}`;
+  let horario = `${ent}–${sai}`;
+  if (ent2 && sai2 && calcMin(ent2, sai2) > 0) horario += ` | ${ent2}–${sai2}`;
+  horarioAlocado[dispId] = horario;
   fecharAlocacao();
   // Re-render table
   const {inicio} = getProximaSemana();
@@ -1535,7 +1560,9 @@ function renderDispTabela(container, datas, dias, inicio) {
         const cor = d.periodo==='manha'?'#FFF9C4':d.periodo==='tarde'?'#BBDEFB':'#C8E6C9';
         const perShort = d.periodo==='manha'?'M':d.periodo==='tarde'?'T':'✓';
         const alocado = horarioAlocado[d.id] || '';
-        const alocadoHtml = alocado ? `<div style="font-size:10px;color:#27500A;font-weight:600;margin-top:2px;">${alocado}</div>` : `<div style="font-size:10px;color:#aaa;margin-top:2px;">+ alocar</div>`;
+        const alocadoHtml = alocado
+          ? alocado.split(' | ').map(t=>`<div style="font-size:10px;color:#27500A;font-weight:600;">${t}</div>`).join('')
+          : `<div style="font-size:10px;color:#aaa;margin-top:2px;">+ alocar</div>`;
         return `<td style="padding:6px;border:1px solid var(--border);text-align:center;background:${cor};cursor:pointer;" title="${perLabel} · ${d.parque||''}${d.observacoes?' · '+d.observacoes:''}" onclick="abrirAlocacao('${d.id}','${nome}','${data}','${perLabel}')"><span style="font-weight:600;">${perShort}</span>${alocadoHtml}</td>`;
       }).join('')}`;
     tb.appendChild(tr);
