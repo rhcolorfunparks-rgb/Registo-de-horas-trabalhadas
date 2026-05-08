@@ -320,10 +320,7 @@
         <div class="card-title">Disponibilidade — semana seguinte</div>
         <div id="dispSemanaInfo" style="font-size:13px;color:var(--muted);margin-bottom:1rem;"></div>
         <div id="dispDias"></div>
-        <div style="margin-top:1rem;">
-          <label style="display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:4px;">Observações gerais da semana</label>
-          <input type="text" id="dispObs" placeholder="Ex: Disponível tarde mas máximo até às 18h..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
-        </div>
+        <input type="hidden" id="dispObs" value="">
         <button onclick="submeterDisponibilidade()" style="width:100%;margin-top:1rem;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Submeter disponibilidade</button>
         <p id="dispMsg" style="font-size:13px;text-align:center;margin-top:8px;min-height:18px;"></p>
       </div>
@@ -1287,7 +1284,7 @@ function renderDiasDisp(inicioSemana, existentes, jaSubmetido) {
           <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="parq_${dataISO}" value="Yupi Color" style="accent-color:var(--accent);" ${existing && existing.parque==='Yupi Color' ? 'checked' : ''}> Yupi Color</label>
           <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="parq_${dataISO}" value="Ambos" style="accent-color:var(--accent);" ${!existing || existing.parque==='Ambos' || !existing.parque ? 'checked' : ''}> Ambos</label>
         </div>
-        <input type="text" id="obs_${dataISO}" placeholder="Observações para este dia (opcional)" value="${existing && existing.observacoes ? existing.observacoes : ''}" style="width:100%;font-size:12px;padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);box-sizing:border-box;">
+
       </div>`;
     el.appendChild(div);
   });
