@@ -1602,13 +1602,18 @@ async function enviarHorarios(nomes) {
     if (!horario) continue;
     const monitor = monitoresCache.find(m=>m.nome===nome);
     if (!monitor) continue;
-    // Create a new registo entry to carry the notification
-    // Use alerta_gestor on most recent registo or create a dedicated notif
-    const regs = await db(`registos?monitor_id=eq.${monitor.id}&order=criado_em.desc&limit=1`);
-    if (regs && regs.length) {
-      await db(`registos?id=eq.${regs[0].id}`, {method:'PATCH', body:{alerta_gestor:`📅 Horário semana ${new Date().toLocaleDateString('pt-PT')}: ${horario}`, visto_monitor:false, alerta_data_envio:new Date().toISOString(), alerta_data_confirmacao:null}, prefer:'return=minimal', headers:{}});
+    try {
+      // Try to attach to most recent registo, or create a new notification registo
+      const regs = await db(`registos?monitor_id=eq.${monitor.id}&order=criado_em.desc&limit=1`);
+      if (regs && regs.length) {
+        await db(`registos?id=eq.${regs[0].id}`, {method:'PATCH', body:{alerta_gestor:`📅 Horário semana ${new Date().toLocaleDateString('pt-PT')}: ${horario}`, visto_monitor:false, alerta_data_envio:new Date().toISOString(), alerta_data_confirmacao:null}, prefer:'return=minimal', headers:{}});
+      } else {
+        // Create a placeholder registo to carry the notification
+        const hoje = new Date().toISOString().split('T')[0];
+        await db('registos', {method:'POST', body:{monitor_id:monitor.id, monitor_nome:monitor.nome, data:hoje, entrada:'00:00', saida:'00:01', equipa:'monitores', estado:'aprovado', alerta_gestor:`📅 Horário semana ${new Date().toLocaleDateString('pt-PT')}: ${horario}`, visto_monitor:false, alerta_data_envio:new Date().toISOString()}});
+      }
       enviados++;
-    }
+    } catch(e) { console.error('Erro ao enviar horário:', e); }
   }
   if (enviados > 0) {
     msg.style.color='var(--green)';
