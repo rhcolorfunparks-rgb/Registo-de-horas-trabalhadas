@@ -409,6 +409,14 @@
     <div class="modal-title">Alocar horário</div>
     <div class="modal-sub" id="alocacaoNome"></div>
     <input type="hidden" id="alocacaoDispId">
+    <div id="alocacaoParqueSection" style="display:none;margin-bottom:12px;">
+      <label style="display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:4px;">Parque a trabalhar</label>
+      <div style="display:flex;gap:10px;">
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="radio" name="alocacaoParqueRadio" id="alocacaoParqueCP" value="Color Party" checked style="accent-color:var(--accent);" onchange="document.getElementById('alocacaoParque').value=this.value"> Color Party</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;"><input type="radio" name="alocacaoParqueRadio" id="alocacaoParqueYC" value="Yupi Color" style="accent-color:var(--accent);" onchange="document.getElementById('alocacaoParque').value=this.value"> Yupi Color</label>
+      </div>
+      <input type="hidden" id="alocacaoParque" value="Color Party">
+    </div>
     <div id="alocacaoLabelTurno1" style="display:none;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">1º Turno (Manhã)</div>
     <div class="field-row" style="margin-bottom:10px;">
       <div class="field"><label>Entrada</label><input type="time" id="alocacaoEntrada"></div>
@@ -1416,6 +1424,14 @@ function abrirAlocacao(dispId, nomeMonitor, data, periodo) {
   document.getElementById('alocacaoDispId').value = dispId;
   document.getElementById('alocacaoNome').textContent = `${nomeMonitor} — ${fmtData(data)} (${periodo})`;
   const isDiaInteiro = periodo === 'Todo o dia';
+  // Show parque selector if monitor indicated "Ambos"
+  const disp = dispCache.find(d=>d.id===dispId);
+  const isAmbos = disp && (disp.parque === 'Ambos' || !disp.parque);
+  const parqueSection = document.getElementById('alocacaoParqueSection');
+  if (parqueSection) parqueSection.style.display = isAmbos ? 'block' : 'none';
+  if (isAmbos) {
+    document.getElementById('alocacaoParque').value = 'Color Party';
+  }
   // Show/hide second shift
   const turno2 = document.getElementById('alocacaoTurno2');
   if (turno2) turno2.style.display = isDiaInteiro ? 'block' : 'none';
@@ -1467,8 +1483,11 @@ function confirmarAlocacao() {
   const err = document.getElementById('alocacaoErro');
   if (!ent || !sai) return err.textContent = 'Indique pelo menos a entrada e saída do 1º turno.';
   if (calcMin(ent, sai) <= 0) return err.textContent = 'Saída deve ser após entrada.';
-  let horario = `${ent}–${sai}`;
-  if (ent2 && sai2 && calcMin(ent2, sai2) > 0) horario += ` | ${ent2}–${sai2}`;
+  const parqueEl = document.getElementById('alocacaoParque');
+  const parqueSel = parqueEl && document.getElementById('alocacaoParqueSection').style.display !== 'none' ? parqueEl.value : null;
+  const parqueTag = parqueSel ? ` (${parqueSel})` : '';
+  let horario = `${ent}–${sai}${parqueTag}`;
+  if (ent2 && sai2 && calcMin(ent2, sai2) > 0) horario += ` | ${ent2}–${sai2}${parqueTag}`;
   horarioAlocado[dispId] = horario;
   fecharAlocacao();
   // Re-render table
