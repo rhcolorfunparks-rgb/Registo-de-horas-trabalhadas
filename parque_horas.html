@@ -302,9 +302,10 @@
     </div>
     <div class="msg erro" id="mErro"></div>
     <div id="notificacoesMonitor" style="display:none;margin-bottom:1rem;"></div>
-    <div style="display:flex;gap:8px;margin-bottom:1rem;">
+    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;">
       <button class="tab ativo" id="mTabRegisto" onclick="mudarTabMonitor('registo')">Registar horas</button>
       <button class="tab" id="mTabDisp" onclick="mudarTabMonitor('disponibilidade')">Disponibilidade</button>
+      <button class="tab" id="mTabHorario" onclick="mudarTabMonitor('horario')">O meu horário</button>
     </div>
     <div id="mSecaoRegisto">
     <div id="totalFuncaoMonitor" style="display:none;margin-bottom:1rem;"></div>
@@ -330,6 +331,15 @@
       <div class="card">
         <div class="card-title">Disponibilidades submetidas</div>
         <div id="dispHistorico"><div class="loading">A carregar...</div></div>
+      </div>
+    </div>
+
+    <!-- O meu horário section -->
+    <div id="mSecaoHorario" style="display:none;">
+      <div class="card">
+        <div class="card-title">O meu horário</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:1rem;">Horários atribuídos pelo gestor</p>
+        <div id="mHorarioLista"><div class="loading">A carregar...</div></div>
       </div>
     </div>
   </div>
@@ -1168,15 +1178,47 @@ async function confirmarAlertaGestor() {
 
 let tabMonitorAtiva = 'registo';
 
+async function carregarMeuHorario() {
+  const el = document.getElementById('mHorarioLista');
+  if (!el) return;
+  try {
+    // Get all registos with alerta_gestor that contain horário
+    const regs = await db(`registos?monitor_id=eq.${monitorAtual.id}&alerta_gestor=like.*Horário*&order=alerta_data_envio.desc&limit=20`) || [];
+    if (!regs.length) {
+      el.innerHTML = '<div class="empty">Sem horários atribuídos ainda.</div>';
+      return;
+    }
+    el.innerHTML = '';
+    regs.forEach(r => {
+      const confirmado = r.alerta_data_confirmacao;
+      const enviado = r.alerta_data_envio ? fmtDateTime(r.alerta_data_envio) : '—';
+      const div = document.createElement('div');
+      div.style.cssText = 'padding:12px 0;border-bottom:1px solid var(--border);';
+      div.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+          <div style="flex:1;">
+            <p style="font-size:14px;font-weight:600;margin:0 0 4px;">📅 ${r.alerta_gestor.replace('📅 ','')}</p>
+            <p style="font-size:11px;color:var(--muted);margin:0;">Enviado em ${enviado}</p>
+          </div>
+          <span class="badge ${confirmado ? 'badge-ok' : 'badge-pend'}">${confirmado ? '✅ Confirmado' : 'Pendente'}</span>
+        </div>`;
+      el.appendChild(div);
+    });
+  } catch(e) {
+    el.innerHTML = '<div class="empty">Erro ao carregar horários.</div>';
+  }
+}
+
 function mudarTabMonitor(tab) {
   tabMonitorAtiva = tab;
   document.getElementById('mTabRegisto').className = 'tab' + (tab==='registo'?' ativo':'');
   document.getElementById('mTabDisp').className = 'tab' + (tab==='disponibilidade'?' ativo':'');
+  document.getElementById('mTabHorario').className = 'tab' + (tab==='horario'?' ativo':'');
   document.getElementById('mSecaoRegisto').style.display = tab==='registo' ? 'block' : 'none';
-  // Hide form card when on disponibilidade tab
-  const formCard = document.querySelector('#ecraMonitor .card:first-of-type');
   document.getElementById('mSecaoDisp').style.display = tab==='disponibilidade' ? 'block' : 'none';
+  document.getElementById('mSecaoHorario').style.display = tab==='horario' ? 'block' : 'none';
   if (tab==='disponibilidade') iniciarDisponibilidade();
+  if (tab==='horario') carregarMeuHorario();
 }
 
 function getProximaSemana() {
@@ -1403,7 +1445,13 @@ function renderDispView(el, inicio, fim) {
         <input type="text" id="hor_${nome.replace(/ /g,'_')}" placeholder="Ex: Ter 10h-14h Color Party, Qui 15h-19h Yupi Color..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);box-sizing:border-box;">
       </div>`).join('')}
     <button onclick="enviarHorarios([${nomes.map(n=>`'${n}'`).join(',')}])" style="width:100%;margin-top:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Enviar horários</button>
-    <p id="enviarHorMsg" style="font-size:13px;text-align:center;margin-top:8px;min-height:18px;"></p>`;
+    <p id="enviarHorMsg" style="font-size:13px;text-align:center;margin-top:8px;min-height:18px;"></p>
+    <div style="margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);">
+      <p style="font-size:14px;font-weight:600;margin:0 0 8px;">Horários enviados — estado</p>
+      <div id="horariosEnviadosLista"><div class="loading">A carregar...</div></div>
+    </div>`;
+  // Load sent horarios status
+  carregarHorariosEnviados(el);
   el.appendChild(enviarDiv);
 }
 
@@ -1621,6 +1669,41 @@ async function enviarHorarios(nomes) {
   } else {
     msg.textContent='Preencha pelo menos um horário antes de enviar.';
   }
+}
+
+async function carregarHorariosEnviados(elParent) {
+  const el = elParent ? elParent.querySelector('#horariosEnviadosLista') : document.getElementById('horariosEnviadosLista');
+  if (!el) return;
+  try {
+    const regs = await db(`registos?alerta_gestor=like.*Horário*&equipa=eq.monitores&order=alerta_data_envio.desc&limit=50`) || [];
+    if (!regs.length) { el.innerHTML='<div class="empty">Nenhum horário enviado ainda.</div>'; return; }
+    const t = document.createElement('table');
+    t.style.cssText='width:100%;border-collapse:collapse;font-size:12px;';
+    t.innerHTML=`<thead><tr>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Monitor</th>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Horário enviado</th>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Enviado em</th>
+      <th style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Estado</th>
+    </tr></thead>`;
+    const tb = document.createElement('tbody');
+    regs.forEach(r => {
+      const tr = document.createElement('tr');
+      const confirmado = r.alerta_data_confirmacao;
+      tr.innerHTML=`
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);font-weight:500;">${r.monitor_nome}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);font-size:11px;">${r.alerta_gestor.replace('📅 ','')}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-size:11px;">${fmtDateTime(r.alerta_data_envio)}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);text-align:center;">
+          ${confirmado
+            ? `<span class="badge badge-ok">✅ ${fmtDateTime(r.alerta_data_confirmacao)}</span>`
+            : `<span class="badge badge-pend">Aguarda confirmação</span>`}
+        </td>`;
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb);
+    el.innerHTML='';
+    el.appendChild(t);
+  } catch(e) { el.innerHTML='<div class="empty">Erro ao carregar.</div>'; }
 }
 
 function gerarPinUnico() {
