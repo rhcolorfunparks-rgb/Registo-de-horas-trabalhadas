@@ -417,7 +417,7 @@
       </div>
       <input type="hidden" id="alocacaoParque" value="Color Party">
     </div>
-    <div id="alocacaoLabelTurno1" style="display:none;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">1º Turno (Manhã)</div>
+    <div id="alocacaoLabelTurno1" style="display:none;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;">1º Turno (Manhã) — opcional</div>
     <div class="field-row" style="margin-bottom:10px;">
       <div class="field"><label>Entrada</label><input type="time" id="alocacaoEntrada"></div>
       <div class="field"><label>Saída</label><input type="time" id="alocacaoSaida"></div>
@@ -1481,13 +1481,17 @@ function confirmarAlocacao() {
   const ent2 = document.getElementById('alocacaoEntrada2').value;
   const sai2 = document.getElementById('alocacaoSaida2').value;
   const err = document.getElementById('alocacaoErro');
-  if (!ent || !sai) return err.textContent = 'Indique pelo menos a entrada e saída do 1º turno.';
-  if (calcMin(ent, sai) <= 0) return err.textContent = 'Saída deve ser após entrada.';
+  const temTurno1 = ent && sai && calcMin(ent,sai) > 0;
+  const temTurno2 = ent2 && sai2 && calcMin(ent2,sai2) > 0;
+  if (!temTurno1 && !temTurno2) return err.textContent = 'Indique pelo menos um turno.';
+  if (ent && sai && calcMin(ent,sai) <= 0) return err.textContent = 'Saída do 1º turno deve ser após entrada.';
   const parqueEl = document.getElementById('alocacaoParque');
   const parqueSel = parqueEl && document.getElementById('alocacaoParqueSection').style.display !== 'none' ? parqueEl.value : null;
   const parqueTag = parqueSel ? ` (${parqueSel})` : '';
-  let horario = `${ent}–${sai}${parqueTag}`;
-  if (ent2 && sai2 && calcMin(ent2, sai2) > 0) horario += ` | ${ent2}–${sai2}${parqueTag}`;
+  const turnos = [];
+  if (temTurno1) turnos.push(`${ent}–${sai}${parqueTag}`);
+  if (temTurno2) turnos.push(`${ent2}–${sai2}${parqueTag}`);
+  let horario = turnos.join(' | ');
   horarioAlocado[dispId] = horario;
   fecharAlocacao();
   // Re-render table
