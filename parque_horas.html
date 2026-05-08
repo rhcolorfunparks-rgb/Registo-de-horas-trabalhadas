@@ -1267,6 +1267,9 @@ async function iniciarDisponibilidade() {
 function renderDiasDisp(inicioSemana, existentes, jaSubmetido) {
   const el = document.getElementById('dispDias');
   el.innerHTML = '';
+  // Force browser to forget any cached form values
+  const form = el.closest('form') || el.parentElement;
+  if (form && form.reset) form.reset();
   const btnSubmeter = document.querySelector('[onclick="submeterDisponibilidade()"]');
   document.getElementById('dispObs').style.display = 'block';
   if (btnSubmeter) {
@@ -1289,19 +1292,19 @@ function renderDiasDisp(inicioSemana, existentes, jaSubmetido) {
     div.style.cssText = 'border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;' + (existing ? 'border-color:#4caf7d;' : '');
     div.innerHTML = `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
-        <input type="checkbox" id="dia_${dataISO}" style="width:18px;height:18px;accent-color:var(--accent);" onchange="toggleDia('${dataISO}')" ${existing ? 'checked' : ''}>
+        <input type="checkbox" id="dia_${dataISO}" autocomplete="off" style="width:18px;height:18px;accent-color:var(--accent);" onchange="toggleDia('${dataISO}')" ${existing ? 'checked' : ''}>
         <label for="dia_${dataISO}" style="font-size:14px;font-weight:600;cursor:pointer;">${nome}, ${data.toLocaleDateString('pt-PT',{day:'numeric',month:'short'})}</label>
       </div>
       <div id="det_${dataISO}" style="display:${existing ? 'block' : 'none'};padding-left:28px;">
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="per_${dataISO}" value="manha" style="accent-color:var(--accent);" ${existing && existing.periodo==='manha' ? 'checked' : ''}> Manhã</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="per_${dataISO}" value="tarde" style="accent-color:var(--accent);" ${existing && existing.periodo==='tarde' ? 'checked' : ''}> Tarde</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="per_${dataISO}" value="dia_inteiro" style="accent-color:var(--accent);" ${!existing || existing.periodo==='dia_inteiro' ? 'checked' : ''}> Dia inteiro</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="per_${dataISO}_${monitorAtual.id}" value="manha" autocomplete="off" style="accent-color:var(--accent);" ${existing && existing.periodo==='manha' ? 'checked' : ''}> Manhã</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="per_${dataISO}_${monitorAtual.id}" value="tarde" autocomplete="off" style="accent-color:var(--accent);" ${existing && existing.periodo==='tarde' ? 'checked' : ''}> Tarde</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="per_${dataISO}_${monitorAtual.id}" value="dia_inteiro" autocomplete="off" style="accent-color:var(--accent);" ${!existing || existing.periodo==='dia_inteiro' ? 'checked' : ''}> Dia inteiro</label>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="parq_${dataISO}" value="Color Party" style="accent-color:var(--accent);" ${existing && existing.parque==='Color Party' ? 'checked' : ''}> Color Party</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="parq_${dataISO}" value="Yupi Color" style="accent-color:var(--accent);" ${existing && existing.parque==='Yupi Color' ? 'checked' : ''}> Yupi Color</label>
-          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="parq_${dataISO}" value="Ambos" style="accent-color:var(--accent);" ${!existing || existing.parque==='Ambos' || !existing.parque ? 'checked' : ''}> Ambos</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="parq_${dataISO}_${monitorAtual.id}" value="Color Party" autocomplete="off" style="accent-color:var(--accent);" ${existing && existing.parque==='Color Party' ? 'checked' : ''}> Color Party</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="parq_${dataISO}_${monitorAtual.id}" value="Yupi Color" autocomplete="off" style="accent-color:var(--accent);" ${existing && existing.parque==='Yupi Color' ? 'checked' : ''}> Yupi Color</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="parq_${dataISO}_${monitorAtual.id}" value="Ambos" autocomplete="off" style="accent-color:var(--accent);" ${!existing || existing.parque==='Ambos' || !existing.parque ? 'checked' : ''}> Ambos</label>
         </div>
 
       </div>`;
@@ -1326,8 +1329,8 @@ async function submeterDisponibilidade() {
     const dataISO = dateToISO(data);
     const checked = document.getElementById(`dia_${dataISO}`)?.checked;
     if (!checked) return;
-    const per = document.querySelector(`input[name="per_${dataISO}"]:checked`)?.value || 'dia_inteiro';
-    const parque = document.querySelector(`input[name="parq_${dataISO}"]:checked`)?.value || 'Ambos';
+    const per = document.querySelector(`input[name="per_${dataISO}_${monitorAtual.id}"]:checked`)?.value || 'dia_inteiro';
+    const parque = document.querySelector(`input[name="parq_${dataISO}_${monitorAtual.id}"]:checked`)?.value || 'Ambos';
     const obs = document.getElementById(`obs_${dataISO}`)?.value.trim() || obsGeral || null;
     registos.push({monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, semana_inicio:dateToISO(inicio), dia:dataISO, periodo:per, parque, observacoes:obs});
   });
