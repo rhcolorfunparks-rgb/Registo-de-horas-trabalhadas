@@ -1190,15 +1190,7 @@ async function carregarMeuHorario() {
     let total = 0;
     const jaContados = new Set();
 
-    disps.forEach(d => {
-      const dow = new Date(d.dia+'T12:00:00').getDay();
-      if (dow === 0 || dow === 6) {
-        total += d.periodo === 'dia_inteiro' ? 2 : 1;
-        jaContados.add(d.dia);
-      }
-    });
-
-    // Add approved registos on weekends not already counted
+    // Count only approved registos on weekends
     regsAprov.forEach(r => {
       if (!r.data || !r.entrada || !r.saida) return;
       const dow = new Date(r.data+'T12:00:00').getDay();
@@ -1732,21 +1724,8 @@ async function carregarSemaforo(el) {
     monitores.forEach(m => periodosPorMonitor[m.nome] = 0);
 
     // Count from disponibilidades
-    disps.forEach(d => {
-      const diaSemana = new Date(d.dia + 'T12:00:00').getDay();
-      if (diaSemana === 0 || diaSemana === 6) {
-        const periodos = d.periodo === 'dia_inteiro' ? 2 : 1;
-        if (periodosPorMonitor[d.monitor_nome] !== undefined) {
-          periodosPorMonitor[d.monitor_nome] += periodos;
-        } else {
-          periodosPorMonitor[d.monitor_nome] = periodos;
-        }
-      }
-    });
-
-    // Also count from approved registos on weekends (to cover weeks before app was used)
-    // Track which monitor+day combos already counted via disponibilidades to avoid double counting
-    const jaContados = new Set(disps.map(d => `${d.monitor_nome}_${d.dia}`));
+    // Count only from approved registos on weekends
+    const jaContados = new Set();
     registos.forEach(r => {
       if (!r.data || !r.entrada || !r.saida) return;
       const diaSemana = new Date(r.data + 'T12:00:00').getDay();
