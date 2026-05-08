@@ -832,6 +832,9 @@ async function iniciarGestor() {
   if (pfs) pfs.style.display = gestorTipo === 'monitores' ? 'block' : 'none';
   const ffs = document.getElementById('funcaoFiltroSection');
   if (ffs) ffs.style.display = gestorTipo === 'monitores' ? 'block' : 'none';
+  // Show disponibilidades tab for monitores
+  const tabDisp = document.getElementById('tabDisp');
+  if (tabDisp) tabDisp.style.display = gestorTipo === 'monitores' ? 'inline-block' : 'none';
   filtroParque = 'todos'; filtroFuncao = 'todas';
   const ano = new Date().getFullYear();
   const sm = document.getElementById('gMes'), sa = document.getElementById('gAno');
