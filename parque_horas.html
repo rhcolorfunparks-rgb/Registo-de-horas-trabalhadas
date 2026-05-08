@@ -302,10 +302,35 @@
     </div>
     <div class="msg erro" id="mErro"></div>
     <div id="notificacoesMonitor" style="display:none;margin-bottom:1rem;"></div>
+    <div style="display:flex;gap:8px;margin-bottom:1rem;">
+      <button class="tab ativo" id="mTabRegisto" onclick="mudarTabMonitor('registo')">Registar horas</button>
+      <button class="tab" id="mTabDisp" onclick="mudarTabMonitor('disponibilidade')">Disponibilidade</button>
+    </div>
+    <div id="mSecaoRegisto">
     <div id="totalFuncaoMonitor" style="display:none;margin-bottom:1rem;"></div>
     <div class="card">
       <div class="card-title">Os meus registos recentes</div>
       <div id="listaMonitor"><div class="loading">A carregar...</div></div>
+    </div>
+    </div><!-- fim mSecaoRegisto -->
+
+    <!-- Disponibilidade section -->
+    <div id="mSecaoDisp" style="display:none;">
+      <div class="card" style="margin-bottom:1rem;">
+        <div class="card-title">Disponibilidade — semana seguinte</div>
+        <div id="dispSemanaInfo" style="font-size:13px;color:var(--muted);margin-bottom:1rem;"></div>
+        <div id="dispDias"></div>
+        <div style="margin-top:1rem;">
+          <label style="display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:4px;">Observações gerais da semana</label>
+          <input type="text" id="dispObs" placeholder="Ex: Disponível tarde mas máximo até às 18h..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
+        </div>
+        <button onclick="submeterDisponibilidade()" style="width:100%;margin-top:1rem;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Submeter disponibilidade</button>
+        <p id="dispMsg" style="font-size:13px;text-align:center;margin-top:8px;min-height:18px;"></p>
+      </div>
+      <div class="card">
+        <div class="card-title">Disponibilidades submetidas</div>
+        <div id="dispHistorico"><div class="loading">A carregar...</div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -344,6 +369,7 @@
       <button class="tab" id="tabApr" onclick="mudarTab('aprovado')">Aprovados</button>
       <button class="tab" id="tabMon" onclick="mudarTab('monitores')">Gerir colaboradores</button>
       <button class="tab" id="tabAlertas" onclick="mudarTab('alertas')">Alertas <span id="badgeAlertas"></span></button>
+      <button class="tab" id="tabDisp" onclick="mudarTab('disponibilidades')" style="display:none;">Disponibilidades</button>
     </div>
     <div id="parqueFiltroSection" style="display:none;margin-bottom:0.5rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -878,7 +904,7 @@ function mudarFiltroParque(p) {
   renderTab();
 }
 function atualizarTabs() {
-  [['tabPend','pendente'],['tabApr','aprovado'],['tabMon','monitores'],['tabAlertas','alertas']].forEach(([id,v])=>{
+  [['tabPend','pendente'],['tabApr','aprovado'],['tabMon','monitores'],['tabAlertas','alertas'],['tabDisp','disponibilidades']].forEach(([id,v])=>{
     document.getElementById(id).className = 'tab'+(tabAtiva===v?' ativo':'');
   });
 }
@@ -886,6 +912,7 @@ function renderTab() {
   const el = document.getElementById('conteudoTab'); el.innerHTML='';
   if (tabAtiva==='monitores') { renderMonitores(el); return; }
   if (tabAtiva==='alertas') { renderAlertas(el); return; }
+  if (tabAtiva==='disponibilidades') { renderDisponibilidades(el); return; }
   let regs = registosCache.filter(r=>r.estado===tabAtiva);
   if (gestorTipo==='monitores' && filtroParque !== 'todos') regs = regs.filter(r=>r.parque===filtroParque);
   if (gestorTipo==='monitores' && filtroFuncao !== 'todas') regs = regs.filter(r=>r.funcao===filtroFuncao);
@@ -1097,6 +1124,239 @@ async function confirmarAlertaGestor() {
     fecharAlertaGestor();
     await carregarGestor();
   } catch(e) { err.textContent = 'Erro ao enviar.'; }
+}
+
+// ============ DISPONIBILIDADE ============
+
+let tabMonitorAtiva = 'registo';
+
+function mudarTabMonitor(tab) {
+  tabMonitorAtiva = tab;
+  document.getElementById('mTabRegisto').className = 'tab' + (tab==='registo'?' ativo':'');
+  document.getElementById('mTabDisp').className = 'tab' + (tab==='disponibilidade'?' ativo':'');
+  document.getElementById('mSecaoRegisto').style.display = tab==='registo' ? 'block' : 'none';
+  // Hide form card when on disponibilidade tab
+  const formCard = document.querySelector('#ecraMonitor .card:first-of-type');
+  document.getElementById('mSecaoDisp').style.display = tab==='disponibilidade' ? 'block' : 'none';
+  if (tab==='disponibilidade') iniciarDisponibilidade();
+}
+
+function getProximaSemana() {
+  const hoje = new Date();
+  const dow = hoje.getDay(); // 0=dom, 1=seg...
+  const diasAteSeg = dow === 0 ? 1 : 8 - dow;
+  const seg = new Date(hoje);
+  seg.setDate(hoje.getDate() + diasAteSeg);
+  const dom = new Date(seg);
+  dom.setDate(seg.getDate() + 6);
+  return {inicio: seg, fim: dom};
+}
+
+function dateToISO(d) { return d.toISOString().split('T')[0]; }
+function fmtDataSimples(d) { return d.toLocaleDateString('pt-PT', {day:'numeric', month:'long'}); }
+
+async function iniciarDisponibilidade() {
+  const {inicio, fim} = getProximaSemana();
+  const semanaStr = `${fmtDataSimples(inicio)} a ${fmtDataSimples(fim)}`;
+  document.getElementById('dispSemanaInfo').textContent = `Semana de ${semanaStr}`;
+
+  // Check if already submitted
+  const jaSubmetido = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicio)}&select=id&limit=1`);
+  
+  renderDiasDisp(inicio, jaSubmetido && jaSubmetido.length > 0);
+  await carregarHistoricoDisp();
+}
+
+function renderDiasDisp(inicioSemana, jaSubmetido) {
+  const el = document.getElementById('dispDias');
+  el.innerHTML = '';
+  if (jaSubmetido) {
+    el.innerHTML = '<div style="background:#EAF3DE;border-radius:var(--radius-sm);padding:12px;font-size:13px;color:#27500A;text-align:center;">✅ Já submeteu a disponibilidade para esta semana.</div>';
+    document.getElementById('dispObs').style.display = 'none';
+    document.querySelector('[onclick="submeterDisponibilidade()"]').style.display = 'none';
+    return;
+  }
+  document.getElementById('dispObs').style.display = 'block';
+  document.querySelector('[onclick="submeterDisponibilidade()"]').style.display = 'block';
+  
+  const dias = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+  dias.forEach((nome, i) => {
+    const data = new Date(inicioSemana);
+    data.setDate(inicioSemana.getDate() + i);
+    const dataISO = dateToISO(data);
+    const div = document.createElement('div');
+    div.style.cssText = 'border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;';
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <input type="checkbox" id="dia_${dataISO}" style="width:18px;height:18px;accent-color:var(--accent);" onchange="toggleDia('${dataISO}')">
+        <label for="dia_${dataISO}" style="font-size:14px;font-weight:600;cursor:pointer;">${nome}, ${data.toLocaleDateString('pt-PT',{day:'numeric',month:'short'})}</label>
+      </div>
+      <div id="det_${dataISO}" style="display:none;padding-left:28px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="per_${dataISO}" value="manha" style="accent-color:var(--accent);" onchange="togglePeriodo('${dataISO}')"> Manhã</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="per_${dataISO}" value="tarde" style="accent-color:var(--accent);" onchange="togglePeriodo('${dataISO}')"> Tarde</label>
+          <label style="display:flex;align-items:center;gap:5px;font-size:13px;cursor:pointer;"><input type="radio" name="per_${dataISO}" value="dia_inteiro" checked style="accent-color:var(--accent);" onchange="togglePeriodo('${dataISO}')"> Dia inteiro</label>
+        </div>
+        <div id="horas_${dataISO}" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+          <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px;">Das</label><input type="time" id="hi_${dataISO}" style="font-size:13px;padding:6px;border-radius:var(--radius-sm);border:1px solid var(--border);"></div>
+          <div><label style="font-size:11px;color:var(--muted);display:block;margin-bottom:3px;">Às</label><input type="time" id="hf_${dataISO}" style="font-size:13px;padding:6px;border-radius:var(--radius-sm);border:1px solid var(--border);"></div>
+        </div>
+        <input type="text" id="obs_${dataISO}" placeholder="Observações para este dia (opcional)" style="width:100%;font-size:12px;padding:6px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);box-sizing:border-box;">
+      </div>`;
+    el.appendChild(div);
+  });
+}
+
+function toggleDia(dataISO) {
+  const checked = document.getElementById(`dia_${dataISO}`).checked;
+  document.getElementById(`det_${dataISO}`).style.display = checked ? 'block' : 'none';
+}
+
+function togglePeriodo(dataISO) {
+  const per = document.querySelector(`input[name="per_${dataISO}"]:checked`)?.value;
+  const horasEl = document.getElementById(`horas_${dataISO}`);
+  if (horasEl) horasEl.style.display = per === 'dia_inteiro' ? 'none' : 'flex';
+}
+
+async function submeterDisponibilidade() {
+  const {inicio} = getProximaSemana();
+  const dias = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+  const registos = [];
+  const obsGeral = document.getElementById('dispObs').value.trim();
+  
+  dias.forEach((nome, i) => {
+    const data = new Date(inicio); data.setDate(inicio.getDate()+i);
+    const dataISO = dateToISO(data);
+    const checked = document.getElementById(`dia_${dataISO}`)?.checked;
+    if (!checked) return;
+    const per = document.querySelector(`input[name="per_${dataISO}"]:checked`)?.value || 'dia_inteiro';
+    const hi = document.getElementById(`hi_${dataISO}`)?.value || null;
+    const hf = document.getElementById(`hf_${dataISO}`)?.value || null;
+    const obs = document.getElementById(`obs_${dataISO}`)?.value.trim() || obsGeral || null;
+    registos.push({monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, semana_inicio:dateToISO(inicio), dia:dataISO, periodo:per, hora_inicio:hi, hora_fim:hf, observacoes:obs});
+  });
+
+  if (!registos.length) {
+    document.getElementById('dispMsg').style.color='var(--red)';
+    document.getElementById('dispMsg').textContent='Selecione pelo menos um dia.';
+    return;
+  }
+
+  try {
+    await Promise.all(registos.map(r => db('disponibilidades', {method:'POST', body:r})));
+    document.getElementById('dispMsg').style.color='var(--green)';
+    document.getElementById('dispMsg').textContent='Disponibilidade submetida com sucesso!';
+    await iniciarDisponibilidade();
+  } catch(e) {
+    document.getElementById('dispMsg').style.color='var(--red)';
+    document.getElementById('dispMsg').textContent='Erro ao submeter. Tente novamente.';
+  }
+}
+
+async function carregarHistoricoDisp() {
+  try {
+    const regs = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&order=dia.desc&limit=20`) || [];
+    const el = document.getElementById('dispHistorico');
+    if (!regs.length) { el.innerHTML='<div class="empty">Sem disponibilidades submetidas.</div>'; return; }
+    const porSemana = {};
+    regs.forEach(r => { if(!porSemana[r.semana_inicio]) porSemana[r.semana_inicio]=[]; porSemana[r.semana_inicio].push(r); });
+    el.innerHTML = Object.entries(porSemana).sort((a,b)=>b[0].localeCompare(a[0])).map(([sem, dias])=>{
+      const semFmt = new Date(sem+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'long'});
+      const linhas = dias.sort((a,b)=>a.dia.localeCompare(b.dia)).map(d=>{
+        const per = d.periodo==='manha'?'Manhã':d.periodo==='tarde'?'Tarde':'Dia inteiro';
+        const horas = d.hora_inicio&&d.hora_fim?` · ${d.hora_inicio}–${d.hora_fim}`:'';
+        const obs = d.observacoes?` · <em>${d.observacoes}</em>`:'';
+        return `<div style="font-size:13px;padding:4px 0;border-bottom:0.5px solid var(--border);">${fmtData(d.dia)} — ${per}${horas}${obs}</div>`;
+      }).join('');
+      return `<div style="margin-bottom:1rem;"><p style="font-size:13px;font-weight:600;margin:0 0 6px;">Semana de ${semFmt}</p>${linhas}</div>`;
+    }).join('');
+  } catch(e) {}
+}
+
+// ============ DISPONIBILIDADES GESTOR ============
+
+async function renderDisponibilidades(el) {
+  el.innerHTML = '<div class="loading">A carregar...</div>';
+  const {inicio, fim} = getProximaSemana();
+  const dataIni = dateToISO(inicio);
+  try {
+    const disps = await db(`disponibilidades?semana_inicio=eq.${dataIni}&order=dia.asc,monitor_nome.asc`) || [];
+    if (!disps.length) {
+      el.innerHTML = `<div class="empty">Sem disponibilidades submetidas para a semana de ${fmtDataSimples(inicio)}.</div>`;
+      return;
+    }
+    // Group by monitor
+    const porMonitor = {};
+    disps.forEach(d => { if(!porMonitor[d.monitor_nome]) porMonitor[d.monitor_nome]=[]; porMonitor[d.monitor_nome].push(d); });
+    const dias = ['Segunda','Terça','Quarta','Quinta','Sexta','Sábado','Domingo'];
+    const datas = dias.map((_,i)=>{ const d=new Date(inicio); d.setDate(inicio.getDate()+i); return dateToISO(d); });
+
+    el.innerHTML = `<p style="font-size:14px;font-weight:600;margin:0 0 12px;">Semana de ${fmtDataSimples(inicio)} a ${fmtDataSimples(fim)}</p>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">${Object.keys(porMonitor).length} monitor${Object.keys(porMonitor).length!==1?'es':''} submeteram disponibilidade</p>`;
+
+    // Grid view
+    const wrap = document.createElement('div'); wrap.style.overflowX='auto';
+    const t = document.createElement('table'); t.style.cssText='width:100%;border-collapse:collapse;font-size:12px;';
+    t.innerHTML=`<thead><tr><th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);white-space:nowrap;">Monitor</th>${dias.map((d,i)=>`<th style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;white-space:nowrap;">${d}<br><span style="font-weight:400;color:var(--muted);">${new Date(datas[i]+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'short'})}</span></th>`).join('')}</tr></thead>`;
+    const tb = document.createElement('tbody');
+    Object.entries(porMonitor).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([nome, disp])=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML=`<td style="padding:6px 8px;border-bottom:1px solid var(--border);font-weight:500;">${nome}</td>${datas.map(data=>{
+        const d = disp.find(x=>x.dia===data);
+        if(!d) return `<td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;color:#ccc;">—</td>`;
+        const per = d.periodo==='manha'?'M':d.periodo==='tarde'?'T':'✓';
+        const cor = d.periodo==='manha'?'#EAF3DE':d.periodo==='tarde'?'#E8F0FE':'#EAF3DE';
+        const title = [d.periodo==='manha'?'Manhã':d.periodo==='tarde'?'Tarde':'Dia inteiro', d.hora_inicio&&d.hora_fim?`${d.hora_inicio}–${d.hora_fim}`:'', d.observacoes||''].filter(Boolean).join(' · ');
+        return `<td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;" title="${title}"><span style="background:${cor};border-radius:4px;padding:2px 6px;font-weight:600;">${per}</span></td>`;
+      }).join('')}`;
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); wrap.appendChild(t); el.appendChild(wrap);
+
+    // Legenda
+    el.innerHTML += `<p style="font-size:11px;color:var(--muted);margin-top:8px;">M = Manhã · T = Tarde · ✓ = Dia inteiro · Passe o rato para ver detalhes</p>`;
+
+    // Enviar horário section
+    const enviarDiv = document.createElement('div');
+    enviarDiv.style.cssText='margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);';
+    enviarDiv.innerHTML=`<p style="font-size:14px;font-weight:600;margin:0 0 8px;">Enviar horário aos monitores</p>
+      <p style="font-size:13px;color:var(--muted);margin:0 0 12px;">Escreva o horário de cada monitor e envie como notificação na app.</p>
+      <div id="enviarHorarioForm">
+        ${Object.keys(porMonitor).sort().map(nome=>`
+          <div style="margin-bottom:10px;">
+            <label style="display:block;font-size:13px;font-weight:500;margin-bottom:4px;">${nome}</label>
+            <input type="text" id="hor_${nome.replace(/\s/g,'_')}" placeholder="Ex: Seg 10h-14h Color Party, Qua 15h-19h Yupi Color..." style="width:100%;font-size:13px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);box-sizing:border-box;">
+          </div>`).join('')}
+        <button onclick="enviarHorarios(${JSON.stringify(Object.keys(porMonitor).sort()).replace(/"/g,"'")})" style="width:100%;margin-top:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Enviar horários</button>
+        <p id="enviarHorMsg" style="font-size:13px;text-align:center;margin-top:8px;min-height:18px;"></p>
+      </div>`;
+    el.appendChild(enviarDiv);
+  } catch(e) { el.innerHTML='<div class="empty">Erro ao carregar disponibilidades.</div>'; }
+}
+
+async function enviarHorarios(nomes) {
+  const msg = document.getElementById('enviarHorMsg');
+  msg.textContent=''; msg.style.color='var(--red)';
+  let enviados = 0;
+  for (const nome of nomes) {
+    const horario = document.getElementById(`hor_${nome.replace(/\s/g,'_')}`)?.value.trim();
+    if (!horario) continue;
+    const monitor = monitoresCache.find(m=>m.nome===nome);
+    if (!monitor) continue;
+    // Create a new registo entry to carry the notification
+    // Use alerta_gestor on most recent registo or create a dedicated notif
+    const regs = await db(`registos?monitor_id=eq.${monitor.id}&order=criado_em.desc&limit=1`);
+    if (regs && regs.length) {
+      await db(`registos?id=eq.${regs[0].id}`, {method:'PATCH', body:{alerta_gestor:`📅 Horário semana ${new Date().toLocaleDateString('pt-PT')}: ${horario}`, visto_monitor:false, alerta_data_envio:new Date().toISOString(), alerta_data_confirmacao:null}, prefer:'return=minimal', headers:{}});
+      enviados++;
+    }
+  }
+  if (enviados > 0) {
+    msg.style.color='var(--green)';
+    msg.textContent=`✅ Horário enviado a ${enviados} monitor${enviados!==1?'es':''}!`;
+  } else {
+    msg.textContent='Preencha pelo menos um horário antes de enviar.';
+  }
 }
 
 function gerarPinUnico() {
