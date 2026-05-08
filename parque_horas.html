@@ -1115,7 +1115,10 @@ function renderAlertas(el) {
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--muted);">${fmtData(r.data)}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);">${r.alerta_gestor}</td>
         <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:var(--muted);">${fmtDateTime(r.alerta_data_envio)}</td>
-        <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:#27500A;font-weight:500;">✅ ${fmtDateTime(r.alerta_data_confirmacao)}</td>`;
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);color:#27500A;font-weight:500;">✅ ${fmtDateTime(r.alerta_data_confirmacao)}</td>
+        <td style="padding:7px 8px;border-bottom:1px solid var(--border);text-align:center;">
+          <button onclick="eliminarAlertaHistorico('${r.id}')" style="font-size:11px;padding:2px 8px;cursor:pointer;border-radius:6px;border:1px solid #ccc;background:transparent;color:#A32D2D;">✕</button>
+        </td>`;
       tb.appendChild(tr);
     });
     t.appendChild(tb); wrap.appendChild(t); el.appendChild(wrap);
