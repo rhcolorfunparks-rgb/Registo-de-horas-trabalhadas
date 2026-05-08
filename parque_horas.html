@@ -1598,7 +1598,7 @@ async function enviarHorarios(nomes) {
   msg.textContent=''; msg.style.color='var(--red)';
   let enviados = 0;
   for (const nome of nomes) {
-    const horario = document.getElementById(`hor_${nome.replace(/\s/g,'_')}`)?.value.trim();
+    const horario = document.getElementById(`hor_${nome.replace(/ /g,'_')}`)?.value.trim();
     if (!horario) continue;
     const monitor = monitoresCache.find(m=>m.nome===nome);
     if (!monitor) continue;
