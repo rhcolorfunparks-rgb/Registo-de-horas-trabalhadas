@@ -1253,15 +1253,14 @@ function mudarTabMonitor(tab) {
   tabMonitorAtiva = tab;
   const home = document.getElementById('mSecaoHome');
   const navBack = document.getElementById('mNavBack');
+  const formCard = document.getElementById('mFormCard');
   const registo = document.getElementById('mSecaoRegisto');
   const disp = document.getElementById('mSecaoDisp');
-  const formCard = document.getElementById('mFormCard');
   if (home) home.style.display = tab==='home' ? 'block' : 'none';
   if (navBack) navBack.style.display = tab==='home' ? 'none' : 'block';
+  if (formCard) formCard.style.display = tab==='registo' ? 'block' : 'none';
   if (registo) registo.style.display = tab==='registo' ? 'block' : 'none';
-  const fc = document.getElementById('mFormCard'); if (fc) fc.style.display = tab==='registo' ? 'block' : 'none';
   if (disp) disp.style.display = tab==='disponibilidade' ? 'block' : 'none';
-  if (formCard) formCard.style.display = tab==='home' ? 'none' : 'none'; // form card hidden always now
   if (tab==='disponibilidade') { iniciarDisponibilidade(); carregarMeuHorario(); }
 }
 
