@@ -342,10 +342,7 @@
         <div class="card-title">Disponibilidades submetidas</div>
         <div id="dispHistorico"><div class="loading">A carregar...</div></div>
       </div>
-      <div class="card" style="margin-top:1rem;">
-        <div class="card-title">A minha disponibilidade — últimas 4 semanas</div>
-        <div id="mSemaforoMonitor"><div class="loading">A carregar...</div></div>
-      </div>
+
     </div>
 
 
@@ -1261,7 +1258,7 @@ function mudarTabMonitor(tab) {
   if (formCard) formCard.style.display = tab==='registo' ? 'block' : 'none';
   if (registo) registo.style.display = tab==='registo' ? 'block' : 'none';
   if (disp) disp.style.display = tab==='disponibilidade' ? 'block' : 'none';
-  if (tab==='disponibilidade') { iniciarDisponibilidade(); carregarMeuHorario(); }
+  if (tab==='disponibilidade') { iniciarDisponibilidade(); }
 }
 
 function getProximaSemana() {
