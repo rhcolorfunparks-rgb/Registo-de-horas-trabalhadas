@@ -201,6 +201,9 @@
       <div class="clock-time" id="clockTime">--:--</div>
       <div class="clock-date" id="clockDate"></div>
     </div>
+    <div style="display:none;margin-bottom:8px;" id="mNavBack">
+      <button onclick="mudarTabMonitor('home')" style="background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;padding:0;">← Voltar</button>
+    </div>
     <div class="card" id="mFormCard" style="margin-bottom:1rem;display:none;">
       <div class="card-title">Registar horas</div>
       <!-- Tipo de dia (só equipa interna) -->
@@ -316,9 +319,6 @@
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;display:none;" id="mTabsRow">
       <button class="tab ativo" id="mTabRegisto" onclick="mudarTabMonitor('registo')">Registar horas</button>
       <button class="tab" id="mTabDisp" onclick="mudarTabMonitor('disponibilidade')">Disponibilidade</button>
-    </div>
-    <div style="display:none;margin-bottom:12px;" id="mNavBack">
-      <button onclick="mudarTabMonitor('home')" style="background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;padding:0;">← Voltar</button>
     </div>
     <div id="mSecaoRegisto">
     <div id="totalFuncaoMonitor" style="display:none;margin-bottom:1rem;"></div>
