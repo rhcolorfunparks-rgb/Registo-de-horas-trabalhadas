@@ -1188,24 +1188,30 @@ async function renderMonitores(el) {
       semConteudo.style.display = isOpen ? 'none' : 'block';
       btnSem.textContent = isOpen ? '📊 Ver semáforo de disponibilidade' : '📊 Fechar semáforo';
     };
+    // Group by color
+    const vermelhos = [], amarelos = [], verdes = [];
+    Object.entries(periodosPorMonitor).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([nome, n]) => {
+      if (n >= 9) verdes.push(nome);
+      else if (n >= 5) amarelos.push(nome);
+      else vermelhos.push(nome);
+    });
+    const maxRows = Math.max(vermelhos.length, amarelos.length, verdes.length);
     const t = document.createElement('table');
     t.style.cssText = 'width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1rem;';
     t.innerHTML = `<thead><tr>
-      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Monitor</th>
-      <th style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Períodos FdS</th>
-      <th style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Estado</th>
+      <th style="padding:8px;border:1px solid var(--border);text-align:center;background:#FFCDD2;font-size:16px;">🔴</th>
+      <th style="padding:8px;border:1px solid var(--border);text-align:center;background:#FFF9C4;font-size:16px;">🟡</th>
+      <th style="padding:8px;border:1px solid var(--border);text-align:center;background:#C8E6C9;font-size:16px;">🟢</th>
     </tr></thead>`;
     const tb = document.createElement('tbody');
-    Object.entries(periodosPorMonitor).sort((a,b)=>a[1]-b[1]).forEach(([nome, n]) => {
-      const emoji = n>=9?'🟢':n>=5?'🟡':'🔴';
-      const cor = n>=9?'#C8E6C930':n>=5?'#FFF9C430':'#FFCDD230';
+    for (let i = 0; i < maxRows; i++) {
       const tr = document.createElement('tr');
-      tr.style.background = cor;
-      tr.innerHTML = `<td style="padding:6px 8px;border-bottom:1px solid var(--border);font-weight:500;">${nome}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;">${n}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;">${emoji}</td>`;
+      tr.innerHTML = `
+        <td style="padding:6px 8px;border:1px solid var(--border);font-size:12px;background:#FFCDD220;">${vermelhos[i]||''}</td>
+        <td style="padding:6px 8px;border:1px solid var(--border);font-size:12px;background:#FFF9C420;">${amarelos[i]||''}</td>
+        <td style="padding:6px 8px;border:1px solid var(--border);font-size:12px;background:#C8E6C920;">${verdes[i]||''}</td>`;
       tb.appendChild(tr);
-    });
+    }
     t.appendChild(tb); semConteudo.appendChild(t);
     semDiv.appendChild(btnSem); semDiv.appendChild(semConteudo); el.appendChild(semDiv);
     const divider = document.createElement('p');
