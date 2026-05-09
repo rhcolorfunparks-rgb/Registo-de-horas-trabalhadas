@@ -976,9 +976,9 @@ function atualizarTabs() {
     document.getElementById(id).className = 'tab'+(tabAtiva===v?' ativo':'');
   });
 }
-function renderTab() {
+async function renderTab() {
   const el = document.getElementById('conteudoTab'); el.innerHTML='';
-  if (tabAtiva==='monitores') { renderMonitores(el); return; }
+  if (tabAtiva==='monitores') { await renderMonitores(el); return; }
   if (tabAtiva==='alertas') { renderAlertas(el); return; }
   if (tabAtiva==='disponibilidades') { renderDisponibilidades(el); return; }
   let regs = registosCache.filter(r=>r.estado===tabAtiva);
@@ -1149,13 +1149,59 @@ async function resolverAlerta(id) {
   } catch(e){}
 }
 
-function renderMonitores(el) {
+async function renderMonitores(el) {
   const add=document.createElement('div'); add.className='add-monitor';
   const pinGerado = gerarPinUnico();
   add.innerHTML=`<input type="text" id="gNome" placeholder="Nome do colaborador" style="flex:1;min-width:130px;font-size:13px;"><input type="text" id="gPin" placeholder="PIN" maxlength="4" value="${pinGerado}" style="width:90px;font-size:13px;"><button onclick="gerarNovoPIN()" style="font-size:12px;padding:6px 8px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg);" title="Gerar novo PIN">🔄</button><button onclick="adicionarMonitor()" style="font-size:13px;padding:6px 14px;cursor:pointer;border-radius:var(--radius-sm);">Adicionar</button>`;
   el.appendChild(add);
   const em=document.createElement('div'); em.id='gErro'; em.className='msg erro'; el.appendChild(em);
   if (!monitoresCache.length) { el.innerHTML+='<div class="empty">Sem monitores. Adicione o primeiro acima.</div>'; return; }
+
+  // Semaforo geral para monitores
+  if (gestorTipo === 'monitores') {
+    const agora = new Date();
+    const dataFim = dateToISO(agora);
+    const dataInicioDate = new Date(agora); dataInicioDate.setDate(agora.getDate()-28);
+    const dataInicio = dateToISO(dataInicioDate);
+    const regsFS = await db(`registos?data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&select=monitor_nome,data,pausa_inicio,pausa_fim`) || [];
+    const periodosPorMonitor = {};
+    monitoresCache.forEach(m => periodosPorMonitor[m.nome] = 0);
+    regsFS.forEach(r => {
+      const dow = new Date(r.data+'T12:00:00').getDay();
+      if (dow === 0 || dow === 6) {
+        const p = (r.pausa_inicio && r.pausa_fim) ? 2 : 1;
+        periodosPorMonitor[r.monitor_nome] = (periodosPorMonitor[r.monitor_nome] || 0) + p;
+      }
+    });
+    const semDiv = document.createElement('div');
+    semDiv.style.cssText = 'margin-bottom:1.5rem;';
+    semDiv.innerHTML = `<p style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Semáforo — últimas 4 semanas</p>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">🔴 &lt;5 · 🟡 5-8 · 🟢 9+ períodos nos fins de semana</p>`;
+    const t = document.createElement('table');
+    t.style.cssText = 'width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1rem;';
+    t.innerHTML = `<thead><tr>
+      <th style="text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Monitor</th>
+      <th style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Períodos FdS</th>
+      <th style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;">Estado</th>
+    </tr></thead>`;
+    const tb = document.createElement('tbody');
+    Object.entries(periodosPorMonitor).sort((a,b)=>a[1]-b[1]).forEach(([nome, n]) => {
+      const emoji = n>=9?'🟢':n>=5?'🟡':'🔴';
+      const cor = n>=9?'#C8E6C930':n>=5?'#FFF9C430':'#FFCDD230';
+      const tr = document.createElement('tr');
+      tr.style.background = cor;
+      tr.innerHTML = `<td style="padding:6px 8px;border-bottom:1px solid var(--border);font-weight:500;">${nome}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;">${n}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;">${emoji}</td>`;
+      tb.appendChild(tr);
+    });
+    t.appendChild(tb); semDiv.appendChild(t); el.appendChild(semDiv);
+    const divider = document.createElement('p');
+    divider.style.cssText = 'font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;padding-top:1rem;border-top:1px solid var(--border);';
+    divider.textContent = 'Lista de monitores';
+    el.appendChild(divider);
+  }
+
   monitoresCache.forEach(m=>{
     const nR=registosCache.filter(r=>r.monitor_id===m.id).length;
     const row=document.createElement('div'); row.className='monitor-row';
@@ -1163,6 +1209,7 @@ function renderMonitores(el) {
     el.appendChild(row);
   });
 }
+
 async function alertarMonitorRegisto(registoId, nomeMonitor) {
   const msg = prompt(`Mensagem para ${nomeMonitor}:`);
   if (!msg || !msg.trim()) return;
