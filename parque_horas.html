@@ -313,14 +313,14 @@
         </button>
       </div>
     </div>
-    <div style="display:none;" id="mNavBack">
-      <button onclick="mudarTabMonitor('home')" style="background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;padding:0;margin-bottom:12px;">← Voltar</button>
-    </div>
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;display:none;" id="mTabsRow">
       <button class="tab ativo" id="mTabRegisto" onclick="mudarTabMonitor('registo')">Registar horas</button>
       <button class="tab" id="mTabDisp" onclick="mudarTabMonitor('disponibilidade')">Disponibilidade</button>
     </div>
     <div id="mSecaoRegisto">
+    <div style="display:none;margin-bottom:12px;" id="mNavBack">
+      <button onclick="mudarTabMonitor('home')" style="background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;padding:0;">← Voltar</button>
+    </div>
     <div id="totalFuncaoMonitor" style="display:none;margin-bottom:1rem;"></div>
     <div class="card">
       <div class="card-title">Os meus registos recentes</div>
@@ -330,6 +330,9 @@
 
     <!-- Disponibilidade section -->
     <div id="mSecaoDisp" style="display:none;">
+      <div style="margin-bottom:12px;">
+        <button onclick="mudarTabMonitor('home')" style="background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;padding:0;">← Voltar</button>
+      </div>
       <div class="card" style="margin-bottom:1rem;">
         <div class="card-title">Disponibilidade — semana seguinte</div>
         <div id="dispSemanaInfo" style="font-size:13px;color:var(--muted);margin-bottom:1rem;"></div>
@@ -1256,7 +1259,7 @@ function mudarTabMonitor(tab) {
   const disp = document.getElementById('mSecaoDisp');
   // Hide all first
   if (home) home.style.display = 'none';
-  if (navBack) navBack.style.display = 'none';
+  // navBack is inside mSecaoRegisto, handled by registo display
   if (formCard) formCard.style.display = 'none';
   if (registo) registo.style.display = 'none';
   if (disp) disp.style.display = 'none';
@@ -1264,11 +1267,10 @@ function mudarTabMonitor(tab) {
   if (tab === 'home') {
     if (home) home.style.display = 'block';
   } else if (tab === 'registo') {
-    if (navBack) navBack.style.display = 'block';
     if (formCard) formCard.style.display = 'block';
     if (registo) registo.style.display = 'block';
-  } else if (tab === 'disponibilidade') {
     if (navBack) navBack.style.display = 'block';
+  } else if (tab === 'disponibilidade') {
     if (disp) disp.style.display = 'block';
     iniciarDisponibilidade();
   }
