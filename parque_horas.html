@@ -1163,10 +1163,11 @@ async function renderMonitores(el) {
     const dataFim = dateToISO(agora);
     const dataInicioDate = new Date(agora); dataInicioDate.setDate(agora.getDate()-28);
     const dataInicio = dateToISO(dataInicioDate);
-    const regsFS = await db(`registos?data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&select=monitor_nome,data,pausa_inicio,pausa_fim`) || [];
+    const regsFS = await db(`registos?data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&equipa=eq.monitores&select=monitor_nome,data,pausa_inicio,pausa_fim`) || [];
     const periodosPorMonitor = {};
     monitoresCache.filter(m => m.equipa === 'monitores').forEach(m => periodosPorMonitor[m.nome] = 0);
     regsFS.forEach(r => {
+      if (!(r.monitor_nome in periodosPorMonitor)) return; // skip if not a monitor
       const dow = new Date(r.data+'T12:00:00').getDay();
       if (dow === 0 || dow === 6) {
         const p = (r.pausa_inicio && r.pausa_fim) ? 2 : 1;
