@@ -1159,7 +1159,7 @@ function renderMonitores(el) {
   monitoresCache.forEach(m=>{
     const nR=registosCache.filter(r=>r.monitor_id===m.id).length;
     const row=document.createElement('div'); row.className='monitor-row';
-    row.innerHTML=`<div style="cursor:pointer;" onclick="abrirPerfilColaborador('${m.id}','${m.nome.replace(/'/g,"\'")}')"><strong style="font-size:14px">${m.nome}</strong><div style="font-size:12px;color:var(--muted);margin-top:2px">PIN: ${m.pin} · ${nR} registo${nR!==1?'s':''} neste mês</div></div><div style="display:flex;gap:6px;"><button class="btn-act edit" onclick="event.stopPropagation();abrirPerfilColaborador('${m.id}','${m.nome.replace(/'/g,"\'")}')">Ver perfil</button><button class="btn-act rej" onclick="event.stopPropagation();removerMonitor('${m.id}')">Remover</button></div>`;
+    row.innerHTML=`<div style="cursor:pointer;" onclick="abrirPerfilMonitor('${m.id}','${m.nome.replace(/'/g,"\'")}')"><strong style="font-size:14px">${m.nome}</strong><div style="font-size:12px;color:var(--muted);margin-top:2px">PIN: ${m.pin} · ${nR} registo${nR!==1?'s':''} neste mês</div></div><div style="display:flex;gap:6px;"><button class="btn-act edit" onclick="event.stopPropagation();abrirPerfilMonitor('${m.id}','${m.nome.replace(/'/g,"\'")}')">Ver perfil</button><button class="btn-act rej" onclick="event.stopPropagation();removerMonitor('${m.id}')">Remover</button></div>`;
     el.appendChild(row);
   });
 }
