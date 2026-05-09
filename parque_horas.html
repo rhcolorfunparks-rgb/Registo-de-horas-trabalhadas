@@ -766,8 +766,8 @@ async function carregarMonitor() {
     renderTotalFuncaoMonitor(regs);
     renderNotificacoes(regs);
     verificarAlertasMonitor(regs);
-    // Show home if first load
-    if (tabMonitorAtiva === 'home') mudarTabMonitor('home');
+    // Show home on first load
+    mudarTabMonitor(tabMonitorAtiva === 'home' ? 'home' : tabMonitorAtiva);
     const hoje = regs.find(r => r.data === hojeISO());
     if (hoje) {
       const hs = hoje.saida ? `${hoje.entrada} → ${hoje.saida} · ${minStr(calcMin(hoje.entrada,hoje.saida))}` : `Entrada: ${hoje.entrada} — a decorrer`;
@@ -1253,12 +1253,24 @@ function mudarTabMonitor(tab) {
   const formCard = document.getElementById('mFormCard');
   const registo = document.getElementById('mSecaoRegisto');
   const disp = document.getElementById('mSecaoDisp');
-  if (home) home.style.display = tab==='home' ? 'block' : 'none';
-  if (navBack) navBack.style.display = tab==='home' ? 'none' : 'block';
-  if (formCard) formCard.style.display = tab==='registo' ? 'block' : 'none';
-  if (registo) registo.style.display = tab==='registo' ? 'block' : 'none';
-  if (disp) disp.style.display = tab==='disponibilidade' ? 'block' : 'none';
-  if (tab==='disponibilidade') { iniciarDisponibilidade(); }
+  // Hide all first
+  if (home) home.style.display = 'none';
+  if (navBack) navBack.style.display = 'none';
+  if (formCard) formCard.style.display = 'none';
+  if (registo) registo.style.display = 'none';
+  if (disp) disp.style.display = 'none';
+  // Show relevant
+  if (tab === 'home') {
+    if (home) home.style.display = 'block';
+  } else if (tab === 'registo') {
+    if (navBack) navBack.style.display = 'block';
+    if (formCard) formCard.style.display = 'block';
+    if (registo) registo.style.display = 'block';
+  } else if (tab === 'disponibilidade') {
+    if (navBack) navBack.style.display = 'block';
+    if (disp) disp.style.display = 'block';
+    iniciarDisponibilidade();
+  }
 }
 
 function getProximaSemana() {
