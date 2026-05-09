@@ -629,6 +629,8 @@ function iniciarRelogio() {
 async function iniciarMonitor() {
   document.getElementById('nomeMonitorTop').textContent = monitorAtual.nome;
   document.getElementById('mErro').textContent = '';
+  tabMonitorAtiva = 'home';
+  mudarTabMonitor('home');
   const isInterno = monitorAtual.equipa === 'interno';
   // Funcao + parque sections (monitores only)
   const fs = document.getElementById('funcaoSection');
@@ -766,8 +768,7 @@ async function carregarMonitor() {
     renderTotalFuncaoMonitor(regs);
     renderNotificacoes(regs);
     verificarAlertasMonitor(regs);
-    // Show home on first load
-    mudarTabMonitor(tabMonitorAtiva === 'home' ? 'home' : tabMonitorAtiva);
+
     const hoje = regs.find(r => r.data === hojeISO());
     if (hoje) {
       const hs = hoje.saida ? `${hoje.entrada} → ${hoje.saida} · ${minStr(calcMin(hoje.entrada,hoje.saida))}` : `Entrada: ${hoje.entrada} — a decorrer`;
