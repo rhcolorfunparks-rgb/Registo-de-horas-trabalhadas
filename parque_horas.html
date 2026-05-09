@@ -1142,7 +1142,7 @@ function renderMonitores(el) {
   monitoresCache.forEach(m=>{
     const nR=registosCache.filter(r=>r.monitor_id===m.id).length;
     const row=document.createElement('div'); row.className='monitor-row';
-    row.innerHTML=`<div style="cursor:pointer;" onclick="abrirPerfilMonitor('${m.id}','${m.nome.replace(/'/g,"\'")}')"><strong style="font-size:14px">${m.nome}</strong><div style="font-size:12px;color:var(--muted);margin-top:2px">PIN: ${m.pin} · ${nR} registo${nR!==1?'s':''} neste mês</div></div><div style="display:flex;gap:6px;"><button class="btn-act edit" onclick="event.stopPropagation();abrirPerfilMonitor('${m.id}','${m.nome.replace(/'/g,"\'")}')">Ver perfil</button><button class="btn-act rej" onclick="event.stopPropagation();removerMonitor('${m.id}')">Remover</button></div>`;
+    row.innerHTML=`<div style="cursor:pointer;" onclick="abrirPerfilColaborador('${m.id}','${m.nome.replace(/'/g,"\'")}')"><strong style="font-size:14px">${m.nome}</strong><div style="font-size:12px;color:var(--muted);margin-top:2px">PIN: ${m.pin} · ${nR} registo${nR!==1?'s':''} neste mês</div></div><div style="display:flex;gap:6px;"><button class="btn-act edit" onclick="event.stopPropagation();abrirPerfilColaborador('${m.id}','${m.nome.replace(/'/g,"\'")}')">Ver perfil</button><button class="btn-act rej" onclick="event.stopPropagation();removerMonitor('${m.id}')">Remover</button></div>`;
     el.appendChild(row);
   });
 }
@@ -1818,7 +1818,7 @@ function fecharPerfil() {
   document.getElementById('modalPerfilOverlay').classList.remove('aberto');
 }
 
-async function abrirPerfilMonitor(monitorId, nomeMonitor) {
+async function abrirPerfilMonitorExterno(monitorId, nomeMonitor) {
   document.getElementById('perfilNome').textContent = nomeMonitor;
   document.getElementById('perfilConteudo').innerHTML = '<div class="loading">A carregar...</div>';
   document.getElementById('modalPerfilOverlay').classList.add('aberto');
@@ -1926,6 +1926,109 @@ async function eliminarAlertaHistorico(id) {
     await db(`registos?id=eq.${id}`, {method:'PATCH', body:{alerta_gestor:null, alerta_data_envio:null, alerta_data_confirmacao:null, visto_monitor:true}, prefer:'return=minimal', headers:{}});
     await carregarGestor();
   } catch(e) { alert('Erro ao eliminar.'); }
+}
+
+async function abrirPerfilColaborador(monitorId, nomeMonitor) {
+  document.getElementById('perfilNome').textContent = nomeMonitor;
+  document.getElementById('perfilConteudo').innerHTML = '<div class="loading">A carregar...</div>';
+  document.getElementById('modalPerfilOverlay').classList.add('aberto');
+
+  try {
+    const agora = new Date();
+    const nomeMeses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+    // Load last 3 months
+    const meses = [];
+    for (let i = 0; i < 3; i++) {
+      const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
+      meses.push({
+        ano: d.getFullYear(), mes: d.getMonth(), nome: nomeMeses[d.getMonth()],
+        inicio: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`,
+        fim: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-31`
+      });
+    }
+
+    const regs = await db(`registos?monitor_id=eq.${monitorId}&estado=eq.aprovado&order=data.desc`) || [];
+
+    // Weekly breakdown for current month
+    const inicioMes = meses[0].inicio;
+    const fimMes = meses[0].fim;
+    const regsM = regs.filter(r=>r.data>=inicioMes&&r.data<=fimMes);
+
+    // Group by week
+    const semanas = {};
+    regsM.forEach(r => {
+      const d = new Date(r.data+'T12:00:00');
+      const dow = d.getDay()===0?6:d.getDay()-1;
+      const seg = new Date(d); seg.setDate(d.getDate()-dow);
+      const semKey = dateToISO(seg);
+      if (!semanas[semKey]) semanas[semKey] = {regs:[], mins:0};
+      const bruto = calcMin(r.entrada,r.saida);
+      const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+      const liq = Math.max(bruto-pausa,0);
+      semanas[semKey].regs.push(r);
+      semanas[semKey].mins += liq;
+    });
+
+    let html = `<p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">${meses[0].nome} ${meses[0].ano} — por semana</p>`;
+
+    if (!Object.keys(semanas).length) {
+      html += '<div class="empty">Sem registos aprovados este mês.</div>';
+    } else {
+      Object.entries(semanas).sort((a,b)=>b[0].localeCompare(a[0])).forEach(([seg, s]) => {
+        const segDate = new Date(seg+'T12:00:00');
+        const domDate = new Date(segDate); domDate.setDate(segDate.getDate()+6);
+        const over40 = s.mins > 40*60;
+        html += `<div style="border:1px solid ${over40?'#A32D2D':'var(--border)'};border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;${over40?'background:#fff5f5':''}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-weight:600;font-size:13px;">Semana ${segDate.toLocaleDateString('pt-PT',{day:'numeric',month:'short'})} – ${domDate.toLocaleDateString('pt-PT',{day:'numeric',month:'short'})}</span>
+            <span style="font-size:13px;font-weight:600;color:${over40?'#A32D2D':'var(--text)'};">${Math.floor(s.mins/60)}h ${s.mins%60}min${over40?' ⚠️':''}</span>
+          </div>
+          ${s.regs.map(r=>{
+            const bruto=calcMin(r.entrada,r.saida);
+            const pausa=r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+            const liq=Math.max(bruto-pausa,0);
+            const tipoDia = r.tipo_dia&&r.tipo_dia!=='normal'?` · ${r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1)}`:'';
+            return `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:2px 0;border-top:0.5px solid var(--border);">
+              <span>${fmtData(r.data)}${tipoDia}</span>
+              <span>${r.entrada}–${r.saida}${r.pausa_inicio?` · Pausa: ${r.pausa_inicio}-${r.pausa_fim}`:''}</span>
+              <span style="font-weight:500;">${Math.floor(liq/60)}h ${liq%60}min</span>
+            </div>`;
+          }).join('')}
+        </div>`;
+      });
+    }
+
+    // Previous months summary
+    meses.slice(1).forEach(m => {
+      const regsM2 = regs.filter(r=>r.data>=m.inicio&&r.data<=m.fim);
+      const totalMins = regsM2.reduce((acc,r)=>{
+        const bruto=calcMin(r.entrada,r.saida);
+        const pausa=r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+        return acc+Math.max(bruto-pausa,0);
+      },0);
+      if (!totalMins) return;
+      html += `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-weight:600;font-size:13px;">${m.nome} ${m.ano}</span>
+          <span style="font-size:13px;font-weight:600;">${Math.floor(totalMins/60)}h ${totalMins%60}min</span>
+        </div>
+      </div>`;
+    });
+
+    document.getElementById('perfilConteudo').innerHTML = html;
+  } catch(e) {
+    document.getElementById('perfilConteudo').innerHTML = '<div class="empty">Erro ao carregar perfil.</div>';
+  }
+}
+
+// Route to correct profile function based on gestorTipo
+function abrirPerfilMonitor(monitorId, nomeMonitor) {
+  if (gestorTipo === 'interno') {
+    abrirPerfilColaborador(monitorId, nomeMonitor);
+  } else {
+    abrirPerfilMonitorExterno(monitorId, nomeMonitor);
+  }
 }
 
 function gerarPinUnico() {
