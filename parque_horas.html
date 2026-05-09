@@ -1165,7 +1165,7 @@ async function renderMonitores(el) {
     const dataInicio = dateToISO(dataInicioDate);
     const regsFS = await db(`registos?data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&select=monitor_nome,data,pausa_inicio,pausa_fim`) || [];
     const periodosPorMonitor = {};
-    monitoresCache.forEach(m => periodosPorMonitor[m.nome] = 0);
+    monitoresCache.filter(m => m.equipa === 'monitores').forEach(m => periodosPorMonitor[m.nome] = 0);
     regsFS.forEach(r => {
       const dow = new Date(r.data+'T12:00:00').getDay();
       if (dow === 0 || dow === 6) {
@@ -1173,10 +1173,20 @@ async function renderMonitores(el) {
         periodosPorMonitor[r.monitor_nome] = (periodosPorMonitor[r.monitor_nome] || 0) + p;
       }
     });
+    // Build semaforo table (hidden by default)
     const semDiv = document.createElement('div');
     semDiv.style.cssText = 'margin-bottom:1.5rem;';
-    semDiv.innerHTML = `<p style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Semáforo — últimas 4 semanas</p>
-      <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">🔴 &lt;5 · 🟡 5-8 · 🟢 9+ períodos nos fins de semana</p>`;
+    const btnSem = document.createElement('button');
+    btnSem.textContent = '📊 Ver semáforo de disponibilidade';
+    btnSem.style.cssText = 'font-size:13px;padding:8px 14px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:"DM Sans",sans-serif;margin-bottom:8px;width:100%;text-align:left;';
+    const semConteudo = document.createElement('div');
+    semConteudo.style.display = 'none';
+    semConteudo.innerHTML = `<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">🔴 &lt;5 · 🟡 5-8 · 🟢 9+ períodos nos fins de semana (últimas 4 semanas)</p>`;
+    btnSem.onclick = () => {
+      const isOpen = semConteudo.style.display !== 'none';
+      semConteudo.style.display = isOpen ? 'none' : 'block';
+      btnSem.textContent = isOpen ? '📊 Ver semáforo de disponibilidade' : '📊 Fechar semáforo';
+    };
     const t = document.createElement('table');
     t.style.cssText = 'width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1rem;';
     t.innerHTML = `<thead><tr>
@@ -1195,7 +1205,8 @@ async function renderMonitores(el) {
         <td style="padding:6px 8px;border-bottom:1px solid var(--border);text-align:center;">${emoji}</td>`;
       tb.appendChild(tr);
     });
-    t.appendChild(tb); semDiv.appendChild(t); el.appendChild(semDiv);
+    t.appendChild(tb); semConteudo.appendChild(t);
+    semDiv.appendChild(btnSem); semDiv.appendChild(semConteudo); el.appendChild(semDiv);
     const divider = document.createElement('p');
     divider.style.cssText = 'font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;padding-top:1rem;border-top:1px solid var(--border);';
     divider.textContent = 'Lista de monitores';
