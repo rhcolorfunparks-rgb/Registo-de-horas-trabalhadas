@@ -201,7 +201,7 @@
       <div class="clock-time" id="clockTime">--:--</div>
       <div class="clock-date" id="clockDate"></div>
     </div>
-    <div class="card" style="margin-bottom:1rem;">
+    <div class="card" id="mFormCard" style="margin-bottom:1rem;display:none;">
       <div class="card-title">Registar horas</div>
       <!-- Tipo de dia (só equipa interna) -->
       <div style="margin-bottom:12px;" id="tipoDiaSection" style="display:none;">
@@ -302,7 +302,21 @@
     </div>
     <div class="msg erro" id="mErro"></div>
     <div id="notificacoesMonitor" style="display:none;margin-bottom:1rem;"></div>
-    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;">
+    <!-- Home screen -->
+    <div id="mSecaoHome" style="display:block;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1rem;">
+        <button onclick="mudarTabMonitor('registo')" style="padding:24px 12px;font-size:15px;font-weight:600;cursor:pointer;border-radius:var(--radius);border:2px solid var(--accent);background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;align-items:center;gap:8px;">
+          <span style="font-size:28px;">⏱️</span>Registar horas
+        </button>
+        <button onclick="mudarTabMonitor('disponibilidade')" style="padding:24px 12px;font-size:15px;font-weight:600;cursor:pointer;border-radius:var(--radius);border:2px solid var(--border);background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;align-items:center;gap:8px;">
+          <span style="font-size:28px;">📅</span>Disponibilidade
+        </button>
+      </div>
+    </div>
+    <div style="display:none;" id="mNavBack">
+      <button onclick="mudarTabMonitor('home')" style="background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;padding:0;margin-bottom:12px;">← Voltar</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;display:none;" id="mTabsRow">
       <button class="tab ativo" id="mTabRegisto" onclick="mudarTabMonitor('registo')">Registar horas</button>
       <button class="tab" id="mTabDisp" onclick="mudarTabMonitor('disponibilidade')">Disponibilidade</button>
     </div>
@@ -755,6 +769,8 @@ async function carregarMonitor() {
     renderTotalFuncaoMonitor(regs);
     renderNotificacoes(regs);
     verificarAlertasMonitor(regs);
+    // Show home if first load
+    if (tabMonitorAtiva === 'home') mudarTabMonitor('home');
     const hoje = regs.find(r => r.data === hojeISO());
     if (hoje) {
       const hs = hoje.saida ? `${hoje.entrada} → ${hoje.saida} · ${minStr(calcMin(hoje.entrada,hoje.saida))}` : `Entrada: ${hoje.entrada} — a decorrer`;
@@ -1183,7 +1199,7 @@ async function confirmarAlertaGestor() {
 
 // ============ DISPONIBILIDADE ============
 
-let tabMonitorAtiva = 'registo';
+let tabMonitorAtiva = 'home';
 
 async function carregarMeuHorario() {
   const el = document.getElementById('mSemaforoMonitor');
@@ -1235,10 +1251,17 @@ async function carregarMeuHorario() {
 
 function mudarTabMonitor(tab) {
   tabMonitorAtiva = tab;
-  document.getElementById('mTabRegisto').className = 'tab' + (tab==='registo'?' ativo':'');
-  document.getElementById('mTabDisp').className = 'tab' + (tab==='disponibilidade'?' ativo':'');
-  document.getElementById('mSecaoRegisto').style.display = tab==='registo' ? 'block' : 'none';
-  document.getElementById('mSecaoDisp').style.display = tab==='disponibilidade' ? 'block' : 'none';
+  const home = document.getElementById('mSecaoHome');
+  const navBack = document.getElementById('mNavBack');
+  const registo = document.getElementById('mSecaoRegisto');
+  const disp = document.getElementById('mSecaoDisp');
+  const formCard = document.getElementById('mFormCard');
+  if (home) home.style.display = tab==='home' ? 'block' : 'none';
+  if (navBack) navBack.style.display = tab==='home' ? 'none' : 'block';
+  if (registo) registo.style.display = tab==='registo' ? 'block' : 'none';
+  const fc = document.getElementById('mFormCard'); if (fc) fc.style.display = tab==='registo' ? 'block' : 'none';
+  if (disp) disp.style.display = tab==='disponibilidade' ? 'block' : 'none';
+  if (formCard) formCard.style.display = tab==='home' ? 'none' : 'none'; // form card hidden always now
   if (tab==='disponibilidade') { iniciarDisponibilidade(); carregarMeuHorario(); }
 }
 
