@@ -1454,12 +1454,7 @@ function renderDispView(el, inicio, fim) {
     <span><span style="background:#f5f5f5;padding:2px 8px;border-radius:4px;color:#ccc;">—</span> Indisponível</span>`;
   el.appendChild(leg);
 
-  // Semáforo de disponibilidade
-  const semaforoDiv = document.createElement('div');
-  semaforoDiv.style.cssText = 'margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);';
-  semaforoDiv.innerHTML = '<p style="font-size:14px;font-weight:600;margin:0 0 8px;">Semáforo de disponibilidade — últimas 4 semanas</p><div id="semaforoLista"><div class="loading">A carregar...</div></div>';
-  el.appendChild(semaforoDiv);
-  carregarSemaforo(document.getElementById('semaforoLista'));
+
 }
 
 function aplicarFiltrosDisp() {
