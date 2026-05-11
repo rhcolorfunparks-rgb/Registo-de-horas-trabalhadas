@@ -1366,6 +1366,12 @@ function mudarTabMonitor(tab) {
   }
 }
 
+// Reset reaberturas on Tuesday
+(function() {
+  const dow = new Date().getDay();
+  if (dow === 2) reaberturasMonitor.clear(); // Clear on Tuesday
+})();
+
 function getProximaSemana() {
   const hoje = new Date();
   const dow = hoje.getDay(); // 0=dom, 1=seg, 2=ter...
@@ -1385,6 +1391,26 @@ function getProximaSemana() {
 function dateToISO(d) { return d.toISOString().split('T')[0]; }
 function fmtDataSimples(d) { return d.toLocaleDateString('pt-PT', {day:'numeric', month:'long'}); }
 
+// Reopen overrides - gestor can reopen form for specific monitors
+let reaberturasMonitor = new Set(); // monitor IDs with reopened form
+
+function formularioBloqueadoParaMonitor() {
+  if (!formularioBloqueado()) return false;
+  // Check if gestor reopened for this monitor
+  return !reaberturasMonitor.has(monitorAtual.id);
+}
+
+function formularioBloqueado() {
+  // Blocked: if today is Monday and time >= 23:59:00, OR
+  // we're past Monday midnight (i.e. it's still "Monday night" before Tue starts - not applicable with JS dates)
+  // In practice: block from Monday 23:59 until Tuesday 00:00
+  const agora = new Date();
+  const dow = agora.getDay(); // 1 = Monday
+  if (dow === 1 && agora.getHours() === 23 && agora.getMinutes() >= 59) return true;
+  // Also block if we somehow get a non-cycle day (shouldn't happen)
+  return false;
+}
+
 async function iniciarDisponibilidade() {
   const {inicio, fim} = getProximaSemana();
   const semanaStr = `${fmtDataSimples(inicio)} a ${fmtDataSimples(fim)}`;
@@ -1392,9 +1418,22 @@ async function iniciarDisponibilidade() {
   // Clear form first to prevent browser cache from previous monitor
   document.getElementById('dispDias').innerHTML = '<div class="loading">A carregar...</div>';
 
+  // Check if form is blocked (after Monday 23:59)
+  const bloqueado = formularioBloqueadoParaMonitor ? formularioBloqueadoParaMonitor() : formularioBloqueado();
+  const btnSubmeter = document.querySelector('[onclick="submeterDisponibilidade()"]');
+  const obsEl = document.getElementById('dispObs');
+
   // Check if already submitted
   const existentes = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicio)}&order=dia.asc`) || [];
-  renderDiasDisp(inicio, existentes, existentes.length > 0);
+
+  if (bloqueado) {
+    document.getElementById('dispDias').innerHTML = '';
+    document.getElementById('dispSemanaInfo').innerHTML = `Semana de ${semanaStr}<br><span style="color:#A32D2D;font-size:12px;">⏰ O prazo de submissão terminou. O formulário abre novamente na próxima terça-feira.</span>`;
+    if (btnSubmeter) btnSubmeter.style.display = 'none';
+    if (obsEl) obsEl.style.display = 'none';
+  } else {
+    renderDiasDisp(inicio, existentes, existentes.length > 0);
+  }
   await carregarHistoricoDisp();
 }
 
@@ -1534,9 +1573,11 @@ function renderDispView(el, inicio, fim) {
   el.innerHTML = '';
 
   // Header
+  const bloqueadoGestor = formularioBloqueado();
   const hdr = document.createElement('div');
   hdr.innerHTML = `<p style="font-size:14px;font-weight:600;margin:0 0 4px;">Semana de ${fmtDataSimples(inicio)} a ${fmtDataSimples(fim)}</p>
-    <p style="font-size:12px;color:var(--muted);margin:0 0 12px;">${nMon} monitor${nMon!==1?'es':''} submeteram disponibilidade</p>`;
+    <p style="font-size:12px;color:var(--muted);margin:0 0 4px;">${nMon} monitor${nMon!==1?'es':''} submeteram disponibilidade</p>
+    ${bloqueadoGestor ? '<p style="font-size:12px;color:#A32D2D;margin:0 0 8px;">⏰ Prazo de submissão encerrado</p>' : ''}`;
   el.appendChild(hdr);
 
   if (!dispCache.length) {
@@ -1580,6 +1621,25 @@ function renderDispView(el, inicio, fim) {
     <span><span style="background:#C8E6C9;padding:2px 8px;border-radius:4px;font-weight:600;">✓</span> Dia inteiro</span>
     <span><span style="background:#f5f5f5;padding:2px 8px;border-radius:4px;color:#ccc;">—</span> Indisponível</span>`;
   el.appendChild(leg);
+
+  // Reabrir formulário para monitor específico (só visível quando bloqueado)
+  if (bloqueadoGestor) {
+    const reabrirDiv = document.createElement('div');
+    reabrirDiv.style.cssText = 'margin-top:1rem;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);';
+    reabrirDiv.innerHTML = `
+      <p style="font-size:13px;font-weight:600;margin:0 0 8px;">🔓 Reabrir formulário para um monitor</p>
+      <p style="font-size:12px;color:var(--muted);margin:0 0 8px;">Permite que um monitor específico submeta disponibilidade após o prazo.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select id="selReabrirMonitor" style="font-size:13px;padding:6px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);flex:1;">
+          <option value="">Selecionar monitor...</option>
+          ${monitoresCache.filter(m=>m.equipa==='monitores').sort((a,b)=>a.nome.localeCompare(b.nome)).map(m=>`<option value="${m.id}">${m.nome}</option>`).join('')}
+        </select>
+        <button onclick="reabrirFormularioMonitor()" style="padding:6px 14px;font-size:13px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--accent);background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Reabrir</button>
+      </div>
+      <div id="reabrirMsg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
+      ${reaberturasMonitor.size > 0 ? `<p style="font-size:12px;color:var(--muted);margin-top:8px;">Reaberto para: ${[...reaberturasMonitor].map(id=>monitoresCache.find(m=>m.id===id)?.nome||id).join(', ')}</p>` : ''}`;
+    el.appendChild(reabrirDiv);
+  }
 
 
 }
@@ -2152,6 +2212,20 @@ function abrirPerfilMonitor(monitorId, nomeMonitor) {
   } else {
     abrirPerfilMonitorExterno(monitorId, nomeMonitor);
   }
+}
+
+function reabrirFormularioMonitor() {
+  const sel = document.getElementById('selReabrirMonitor');
+  const msg = document.getElementById('reabrirMsg');
+  if (!sel || !sel.value) {
+    if (msg) { msg.style.color='var(--red)'; msg.textContent='Selecione um monitor.'; }
+    return;
+  }
+  const monitorId = sel.value;
+  const nomeMonitor = monitoresCache.find(m=>m.id===monitorId)?.nome || '';
+  reaberturasMonitor.add(monitorId);
+  if (msg) { msg.style.color='var(--green)'; msg.textContent=`✅ Formulário reaberto para ${nomeMonitor}. Válido até ao próximo fecho.`; }
+  setTimeout(() => { if (msg) msg.textContent=''; }, 4000);
 }
 
 function gerarPinUnico() {
