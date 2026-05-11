@@ -1453,7 +1453,10 @@ async function submeterDisponibilidade() {
     registos.push({monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, semana_inicio:dateToISO(inicio), dia:dataISO, periodo:per, parque, observacoes:obs});
   });
 
-  // Allow submitting with zero days (means no availability this week)
+  // If no days selected, create a "sem disponibilidade" record
+  if (!registos.length) {
+    registos.push({monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, semana_inicio:dateToISO(inicio), dia:dateToISO(inicio), periodo:'sem_disponibilidade', parque:null, observacoes:'Sem disponibilidade esta semana'});
+  }
 
   try {
     await Promise.all(registos.map(r => db('disponibilidades', {method:'POST', body:r})));
@@ -1476,7 +1479,7 @@ async function carregarHistoricoDisp() {
     el.innerHTML = Object.entries(porSemana).sort((a,b)=>b[0].localeCompare(a[0])).map(([sem, dias])=>{
       const semFmt = new Date(sem+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'long'});
       const linhas = dias.sort((a,b)=>a.dia.localeCompare(b.dia)).map(d=>{
-        const per = d.periodo==='manha'?'Manhã':d.periodo==='tarde'?'Tarde':'Dia inteiro';
+        const per = d.periodo==='manha'?'Manhã':d.periodo==='tarde'?'Tarde':d.periodo==='dia_inteiro'?'Dia inteiro':'Sem disponibilidade';
         const parq = d.parque ? ` · ${d.parque}` : '';
         const obs = d.observacoes?` · <em>${d.observacoes}</em>`:'';
         return `<div style="font-size:13px;padding:4px 0;border-bottom:0.5px solid var(--border);">${fmtData(d.dia)} — ${per}${parq}${obs}</div>`;
@@ -1751,6 +1754,7 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
       ${datasVisiveis.map(data=>{
         const d = dispMonitor.find(x=>x.dia===data);
         if(!d) return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:#fff5f5;color:#ccc;">—</td>`;
+        if(d.periodo==='sem_disponibilidade') return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:#f5f5f5;color:#aaa;font-size:11px;">S/D</td>`;
         // Hide cell if parque filter doesn't match
         const parqueMatch = filtroDispParque === 'todos' || d.parque === filtroDispParque || d.parque === 'Ambos';
         if (!parqueMatch) return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:#fff5f5;color:#ccc;">—</td>`;
