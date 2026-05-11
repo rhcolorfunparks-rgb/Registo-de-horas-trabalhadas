@@ -1436,8 +1436,13 @@ async function iniciarDisponibilidade() {
   const existentes = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicio)}&order=dia.asc`) || [];
 
   if (bloqueado) {
-    document.getElementById('dispDias').innerHTML = '';
-    document.getElementById('dispSemanaInfo').innerHTML = `Semana de ${semanaStr}<br><span style="color:#A32D2D;font-size:12px;">⏰ O prazo de submissão terminou. O formulário abre novamente na próxima terça-feira.</span>`;
+    document.getElementById('dispDias').innerHTML = `
+      <div style="background:#FFF9C4;border-radius:var(--radius-sm);padding:16px;text-align:center;margin-bottom:12px;">
+        <div style="font-size:24px;margin-bottom:8px;">⏰</div>
+        <p style="font-size:14px;font-weight:600;margin:0 0 4px;color:var(--text);">Formulário encerrado</p>
+        <p style="font-size:13px;color:var(--muted);margin:0;">Um novo formulário estará disponível a partir de terça-feira.</p>
+      </div>`;
+    document.getElementById('dispSemanaInfo').textContent = `Semana de ${semanaStr}`;
     if (btnSubmeter) btnSubmeter.style.display = 'none';
     if (obsEl) obsEl.style.display = 'none';
   } else {
