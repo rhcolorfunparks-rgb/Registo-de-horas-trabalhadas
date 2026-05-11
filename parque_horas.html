@@ -1372,6 +1372,15 @@ function mudarTabMonitor(tab) {
   if (dow === 2) reaberturasMonitor.clear(); // Clear on Tuesday
 })();
 
+function getSemanaComOffset(offset) {
+  const {inicio} = getProximaSemana();
+  const ter = new Date(inicio);
+  ter.setDate(ter.getDate() + (offset * 7));
+  const seg = new Date(ter);
+  seg.setDate(ter.getDate() + 6);
+  return {inicio: ter, fim: seg};
+}
+
 function getProximaSemana() {
   const hoje = new Date();
   const dow = hoje.getDay(); // 0=dom, 1=seg, 2=ter...
@@ -1547,22 +1556,29 @@ async function carregarHistoricoDisp() {
 // ============ DISPONIBILIDADES GESTOR ============
 
 let dispCache = [];
+let semanaOffset = 0; // 0 = proxima semana, -1 = semana anterior, etc.
 let filtroDispDia = 'todos';
 let filtroDispPer = 'todos';
 let filtroDispParque = 'todos';
 
 async function renderDisponibilidades(el) {
   el.innerHTML = '<div class="loading">A carregar...</div>';
-  const {inicio, fim} = getProximaSemana();
+  const {inicio, fim} = getSemanaComOffset(semanaOffset);
   const dataIni = dateToISO(inicio);
   try {
     dispCache = await db(`disponibilidades?semana_inicio=eq.${dataIni}&order=dia.asc,monitor_nome.asc`) || [];
     filtroDispDia = 'todos'; filtroDispPer = 'todos'; filtroDispParque = 'todos';
     horarioAlocado = {};
-    // Reset checkboxes
+    semanaOffset = 0; // reset to next week when opening tab
     ['fPerManha','fPerTarde','fPerDiaInteiro'].forEach(id=>{ const el=document.getElementById(id); if(el) el.checked=false; });
     renderDispView(el, inicio, fim);
   } catch(e) { el.innerHTML='<div class="empty">Erro ao carregar disponibilidades.</div>'; }
+}
+
+function navegarSemana(delta) {
+  semanaOffset += delta;
+  const tabEl = document.getElementById('conteudoTab');
+  if (tabEl) { tabEl.innerHTML = ''; renderDisponibilidades(tabEl); }
 }
 
 function renderDispView(el, inicio, fim) {
@@ -1575,9 +1591,15 @@ function renderDispView(el, inicio, fim) {
   // Header
   const bloqueadoGestor = formularioBloqueado();
   const hdr = document.createElement('div');
-  hdr.innerHTML = `<p style="font-size:14px;font-weight:600;margin:0 0 4px;">Semana de ${fmtDataSimples(inicio)} a ${fmtDataSimples(fim)}</p>
-    <p style="font-size:12px;color:var(--muted);margin:0 0 4px;">${nMon} monitor${nMon!==1?'es':''} submeteram disponibilidade</p>
-    ${bloqueadoGestor ? '<p style="font-size:12px;color:#A32D2D;margin:0 0 8px;">⏰ Prazo de submissão encerrado</p>' : ''}`;
+  hdr.style.cssText = 'margin-bottom:12px;';
+  hdr.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:4px;">
+      <button onclick="navegarSemana(-1)" style="padding:4px 12px;font-size:18px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);">←</button>
+      <p style="font-size:14px;font-weight:600;margin:0;flex:1;text-align:center;">Semana de ${fmtDataSimples(inicio)} a ${fmtDataSimples(fim)}</p>
+      <button onclick="navegarSemana(1)" style="padding:4px 12px;font-size:18px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);">→</button>
+    </div>
+    <p style="font-size:12px;color:var(--muted);margin:0 0 4px;text-align:center;">${nMon} monitor${nMon!==1?'es':''} submeteram disponibilidade</p>
+    ${bloqueadoGestor && semanaOffset === 0 ? '<p style="font-size:12px;color:#A32D2D;margin:0 0 8px;text-align:center;">⏰ Prazo de submissão encerrado</p>' : ''}`;
   el.appendChild(hdr);
 
   if (!dispCache.length) {
