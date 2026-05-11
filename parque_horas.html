@@ -842,6 +842,12 @@ async function submeterRegisto() {
       ? (document.getElementById('mObs') ? document.getElementById('mObs').value.trim() || null : null)
       : (document.getElementById('mObsMonitor') ? document.getElementById('mObsMonitor').value.trim() || null : null);
     try {
+      // Check for duplicate - same monitor, same date, same entry time
+      const existentes = await db(`registos?monitor_id=eq.${monitorAtual.id}&data=eq.${data}&entrada=eq.${ent}&saida=eq.${sai}`) || [];
+      if (existentes.length > 0) {
+        err.style.color = 'var(--red)';
+        return err.textContent = 'Já existe um registo com este horário para esta data. Verifique os seus registos recentes.';
+      }
       await db('registos', {method:'POST', body:{monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, data, entrada:ent, saida:sai, pausa_inicio:pausaInicio, pausa_fim:pausaFim, observacoes:obs, funcao, parque, equipa, tipo_dia:'normal', estado:'pendente'}});
       err.style.color = 'var(--green)'; err.textContent = 'Registo submetido com sucesso!';
       document.getElementById('mEntrada').value = '';
@@ -858,7 +864,17 @@ async function submeterRegisto() {
       prev.textContent = '';
       setTimeout(() => { err.textContent = ''; err.style.color = 'var(--red)'; }, 3000);
       await carregarMonitor();
-    } catch(e) { err.textContent = 'Erro ao guardar. Tente novamente.'; }
+    } catch(e) {
+      // Check if record was actually saved despite the error
+      const verificar = await db(`registos?monitor_id=eq.${monitorAtual.id}&data=eq.${data}&entrada=eq.${ent}&saida=eq.${sai}`) || [];
+      if (verificar.length > 0) {
+        err.style.color = 'var(--green)';
+        err.textContent = 'Registo guardado com sucesso!';
+        await carregarMonitor();
+      } else {
+        err.textContent = 'Erro ao guardar. Tente novamente.';
+      }
+    }
   } else {
     // Folga / Férias / Feriado
     const obs = document.getElementById('mObs') ? document.getElementById('mObs').value.trim() || null : null;
