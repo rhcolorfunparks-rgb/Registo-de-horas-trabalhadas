@@ -1869,6 +1869,13 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
     tb.appendChild(tr);
   });
   t.appendChild(tb); wrap.appendChild(t); container.appendChild(wrap);
+
+  // Add total counter
+  const total = monitoresVisiveis.length;
+  const totalDiv = document.createElement('div');
+  totalDiv.style.cssText = 'margin-top:8px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;font-weight:600;text-align:right;';
+  totalDiv.textContent = `${total} monitor${total!==1?'es':''} disponíve${total!==1?'is':'l'} com os filtros aplicados`;
+  container.appendChild(totalDiv);
 }
 
 async function enviarHorarios(nomes) {
