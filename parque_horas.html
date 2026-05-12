@@ -1594,12 +1594,13 @@ function renderDispView(el, inicio, fim) {
   el.innerHTML = '';
 
   // Header
-  // Bloqueado se: a segunda-feira da semana visualizada já passou
+  // Bloqueado se: a segunda-feira ANTERIOR ao início da semana já passou
+  // (prazo fecha na segunda antes da terça de início)
   const agora = new Date();
-  // fim is a Date object from getSemanaComOffset
-  const fimSemanaDate = new Date(fim);
-  fimSemanaDate.setHours(23, 59, 59, 0);
-  const bloqueadoGestor = agora > fimSemanaDate || formularioBloqueado();
+  const segundaAnterior = new Date(inicio);
+  segundaAnterior.setDate(inicio.getDate() - 1); // dia antes da terça = segunda
+  segundaAnterior.setHours(23, 59, 59, 0);
+  const bloqueadoGestor = agora > segundaAnterior || formularioBloqueado();
   const hdr = document.createElement('div');
   hdr.style.cssText = 'margin-bottom:12px;';
   hdr.innerHTML = `
