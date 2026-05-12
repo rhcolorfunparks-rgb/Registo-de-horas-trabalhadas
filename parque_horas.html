@@ -1595,10 +1595,10 @@ function renderDispView(el, inicio, fim) {
 
   // Header
   // Bloqueado se: a segunda-feira da semana visualizada já passou
-  const fimSemanaVista = fim; // fim = segunda-feira da semana
   const agora = new Date();
-  const fimSemanaDate = new Date(fimSemanaVista);
-  fimSemanaDate.setHours(23, 59, 0, 0);
+  // fim is a Date object from getSemanaComOffset
+  const fimSemanaDate = new Date(fim);
+  fimSemanaDate.setHours(23, 59, 59, 0);
   const bloqueadoGestor = agora > fimSemanaDate || formularioBloqueado();
   const hdr = document.createElement('div');
   hdr.style.cssText = 'margin-bottom:12px;';
