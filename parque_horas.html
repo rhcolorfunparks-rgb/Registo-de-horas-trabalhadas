@@ -1366,11 +1366,14 @@ function mudarTabMonitor(tab) {
   }
 }
 
+let reaberturasMonitor = new Set(); // monitor IDs with reopened form
+
 // Reset reaberturas on Tuesday
-document.addEventListener('DOMContentLoaded', function() {
+(function() {
   const dow = new Date().getDay();
- if (dow === 2) reaberturasMonitor.clear(); // Clear on Tuesday
-});
+  if (dow === 2) reaberturasMonitor.clear(); // Clear on Tuesday
+})();
+
 function getSemanaComOffset(offset) {
   const {inicio} = getProximaSemana();
   const ter = new Date(inicio);
@@ -1400,8 +1403,6 @@ function dateToISO(d) { return d.toISOString().split('T')[0]; }
 function fmtDataSimples(d) { return d.toLocaleDateString('pt-PT', {day:'numeric', month:'long'}); }
 
 // Reopen overrides - gestor can reopen form for specific monitors
-let reaberturasMonitor = new Set(); // monitor IDs with reopened form
-
 function formularioBloqueadoParaMonitor() {
   if (!formularioBloqueado()) return false;
   // Check if gestor reopened for this monitor
@@ -1593,7 +1594,12 @@ function renderDispView(el, inicio, fim) {
   el.innerHTML = '';
 
   // Header
-  const bloqueadoGestor = formularioBloqueado();
+  // Bloqueado se: a segunda-feira da semana visualizada já passou
+  const fimSemanaVista = fim; // fim = segunda-feira da semana
+  const agora = new Date();
+  const fimSemanaDate = new Date(fimSemanaVista);
+  fimSemanaDate.setHours(23, 59, 0, 0);
+  const bloqueadoGestor = agora > fimSemanaDate || formularioBloqueado();
   const hdr = document.createElement('div');
   hdr.style.cssText = 'margin-bottom:12px;';
   hdr.innerHTML = `
@@ -1603,7 +1609,7 @@ function renderDispView(el, inicio, fim) {
       <button onclick="navegarSemana(1)" style="padding:4px 12px;font-size:18px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);">→</button>
     </div>
     <p style="font-size:12px;color:var(--muted);margin:0 0 4px;text-align:center;">${nMon} monitor${nMon!==1?'es':''} submeteram disponibilidade</p>
-    ${bloqueadoGestor && semanaOffset === 0 ? '<p style="font-size:12px;color:#A32D2D;margin:0 0 8px;text-align:center;">⏰ Prazo de submissão encerrado</p>' : ''}`;
+    ${bloqueadoGestor ? '<p style="font-size:12px;color:#A32D2D;margin:0 0 8px;text-align:center;">⏰ Prazo de submissão encerrado</p>' : ''}`;
   el.appendChild(hdr);
 
   if (!dispCache.length) {
