@@ -333,25 +333,12 @@
       <div style="margin-bottom:12px;">
         <button onclick="mudarTabMonitor('home')" style="background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;padding:0;">← Voltar</button>
       </div>
-      <!-- Card semana reaberta (só aparece quando gestor reabriu) -->
-      <div id="cardSemanaReaberta" style="display:none;margin-bottom:1rem;" class="card">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
-          <div class="card-title" style="margin-bottom:0;">Disponibilidade — semana anterior</div>
-          <span style="font-size:11px;background:#FEF3E2;color:#92600A;padding:2px 8px;border-radius:20px;font-weight:600;">⚠️ reaberto pelo gestor</span>
-        </div>
-        <div id="dispSemanaInfoReaberta" style="font-size:13px;color:var(--muted);margin-bottom:1rem;"></div>
-        <div id="dispDiasReaberta"></div>
-        <input type="hidden" id="dispObsReaberta" value="">
-        <button id="btnSubmeterReaberta" onclick="submeterDisponibilidade('reaberta')" style="width:100%;margin-top:1rem;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:#92600A;color:#fff;font-family:'DM Sans',sans-serif;">Submeter semana anterior</button>
-        <p id="dispMsgReaberta" style="font-size:13px;text-align:center;margin-top:8px;min-height:18px;"></p>
-      </div>
-      <!-- Card semana atual/seguinte -->
       <div class="card" style="margin-bottom:1rem;">
         <div class="card-title">Disponibilidade — semana seguinte</div>
         <div id="dispSemanaInfo" style="font-size:13px;color:var(--muted);margin-bottom:1rem;"></div>
         <div id="dispDias"></div>
         <input type="hidden" id="dispObs" value="">
-        <button id="btnSubmeterNormal" onclick="submeterDisponibilidade('normal')" style="width:100%;margin-top:1rem;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Submeter disponibilidade</button>
+        <button onclick="submeterDisponibilidade()" style="width:100%;margin-top:1rem;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Submeter disponibilidade</button>
         <p id="dispMsg" style="font-size:13px;text-align:center;margin-top:8px;min-height:18px;"></p>
       </div>
       <div class="card">
@@ -1412,8 +1399,21 @@ let reaberturasMonitor = new Map(); // monitor ID -> expiry timestamp (24h)
   if (dow === 2) reaberturasMonitor.clear(); // Clear expired on Tuesday
 })();
 
+function getSemanaAtual() {
+  // Returns the week currently in progress (starts on the most recent Tuesday)
+  const hoje = new Date();
+  const dow = hoje.getDay(); // 0=dom,1=seg,2=ter,...,6=sab
+  // Days since last Tuesday
+  const diasDesdeTerc = dow === 2 ? 0 : dow === 1 ? 6 : dow === 0 ? 5 : dow - 2;
+  const ter = new Date(hoje);
+  ter.setDate(hoje.getDate() - diasDesdeTerc);
+  const seg = new Date(ter);
+  seg.setDate(ter.getDate() + 6);
+  return {inicio: ter, fim: seg};
+}
+
 function getSemanaComOffset(offset) {
-  const {inicio} = getProximaSemana();
+  const {inicio} = getSemanaAtual();
   const ter = new Date(inicio);
   ter.setDate(ter.getDate() + (offset * 7));
   const seg = new Date(ter);
@@ -1437,14 +1437,6 @@ function getProximaSemana() {
   return {inicio: ter, fim: seg};
 }
 
-function getSemanaAnterior() {
-  const {inicio} = getProximaSemana();
-  const ter = new Date(inicio);
-  ter.setDate(ter.getDate() - 7);
-  const seg = new Date(ter);
-  seg.setDate(ter.getDate() + 6);
-  return {inicio: ter, fim: seg};
-}
 function dateToISO(d) { return d.toISOString().split('T')[0]; }
 function fmtDataSimples(d) { return d.toLocaleDateString('pt-PT', {day:'numeric', month:'long'}); }
 
@@ -1475,42 +1467,26 @@ function formularioBloqueado() {
 }
 
 async function iniciarDisponibilidade() {
+  const {inicio, fim} = getProximaSemana();
+  const semanaStr = `${fmtDataSimples(inicio)} a ${fmtDataSimples(fim)}`;
+  document.getElementById('dispSemanaInfo').textContent = `Semana de ${semanaStr}`;
+  // Clear form first to prevent browser cache from previous monitor
   document.getElementById('dispDias').innerHTML = '<div class="loading">A carregar...</div>';
 
   // Reload monitor data to get fresh reaberto_ate
   const monitorData = await db(`monitores?id=eq.${monitorAtual.id}&select=reaberto_ate`) || [];
   if (monitorData.length) {
     monitorAtual.reaberto_ate = monitorData[0].reaberto_ate;
+    // Also update monitoresCache
     const cached = monitoresCache.find(m=>m.id===monitorAtual.id);
     if (cached) cached.reaberto_ate = monitorData[0].reaberto_ate;
   }
-
-  // Verificar se há reabertura válida
-  let semanaReaberta = false;
-  if (monitorAtual.reaberto_ate) {
-    const expiry = new Date(monitorAtual.reaberto_ate).getTime();
-    if (Date.now() < expiry) semanaReaberta = true;
-  }
-
-  const cardReaberta = document.getElementById('cardSemanaReaberta');
-
-  if (semanaReaberta) {
-    // Mostrar card da semana reaberta
-    cardReaberta.style.display = 'block';
-    const {inicio: inicioAnt, fim: fimAnt} = getSemanaAnterior();
-    const semanaStrAnt = `${fmtDataSimples(inicioAnt)} a ${fmtDataSimples(fimAnt)}`;
-    document.getElementById('dispSemanaInfoReaberta').textContent = `Semana de ${semanaStrAnt}`;
-    const existentesAnt = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicioAnt)}&order=dia.asc`) || [];
-    renderDiasDisp(inicioAnt, existentesAnt, existentesAnt.length > 0, 'reaberta');
-  } else {
-    cardReaberta.style.display = 'none';
-  }
-
-  // Sempre mostrar card da semana atual/seguinte
-  const {inicio, fim} = getProximaSemana();
-  const semanaStr = `${fmtDataSimples(inicio)} a ${fmtDataSimples(fim)}`;
-  document.getElementById('dispSemanaInfo').textContent = `Semana de ${semanaStr}`;
+  // Check if form is blocked (after Monday 23:59)
   const bloqueado = formularioBloqueadoParaMonitor ? formularioBloqueadoParaMonitor() : formularioBloqueado();
+  const btnSubmeter = document.querySelector('[onclick="submeterDisponibilidade()"]');
+  const obsEl = document.getElementById('dispObs');
+
+  // Check if already submitted
   const existentes = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicio)}&order=dia.asc`) || [];
 
   if (bloqueado) {
@@ -1520,32 +1496,26 @@ async function iniciarDisponibilidade() {
         <p style="font-size:14px;font-weight:600;margin:0 0 4px;color:var(--text);">Formulário encerrado</p>
         <p style="font-size:13px;color:var(--muted);margin:0;">Um novo formulário estará disponível a partir de terça-feira.</p>
       </div>`;
-    const btnSubmeter = document.getElementById("btnSubmeterNormal");
-    const obsEl = document.getElementById('dispObs');
+    document.getElementById('dispSemanaInfo').textContent = `Semana de ${semanaStr}`;
     if (btnSubmeter) btnSubmeter.style.display = 'none';
     if (obsEl) obsEl.style.display = 'none';
   } else {
-    renderDiasDisp(inicio, existentes, existentes.length > 0, 'normal');
+    renderDiasDisp(inicio, existentes, existentes.length > 0);
   }
   await carregarHistoricoDisp();
 }
 
-function renderDiasDisp(inicioSemana, existentes, jaSubmetido, modo) {
-  // modo: 'normal' ou 'reaberta'
-  const isReaberta = modo === 'reaberta';
-  const elId = isReaberta ? 'dispDiasReaberta' : 'dispDias';
-  const obsId = isReaberta ? 'dispObsReaberta' : 'dispObs';
-  const btnSel = isReaberta ? 'btnSubmeterReaberta' : 'btnSubmeterNormal';
-  const el = document.getElementById(elId);
+function renderDiasDisp(inicioSemana, existentes, jaSubmetido) {
+  const el = document.getElementById('dispDias');
   el.innerHTML = '';
-  const btnSubmeter = document.getElementById(btnSel);
-  const obsEl = document.getElementById(obsId);
-  if (obsEl) obsEl.style.display = 'block';
+  // Force browser to forget any cached form values
+  const form = el.closest('form') || el.parentElement;
+  if (form && form.reset) form.reset();
+  const btnSubmeter = document.querySelector('[onclick="submeterDisponibilidade()"]');
+  document.getElementById('dispObs').style.display = 'block';
   if (btnSubmeter) {
     btnSubmeter.style.display = 'block';
-    btnSubmeter.textContent = isReaberta
-      ? (jaSubmetido ? 'Atualizar semana anterior' : 'Submeter semana anterior')
-      : (jaSubmetido ? 'Atualizar disponibilidade' : 'Submeter disponibilidade');
+    btnSubmeter.textContent = jaSubmetido ? 'Atualizar disponibilidade' : 'Submeter disponibilidade';
   }
   if (jaSubmetido) {
     const notice = document.createElement('div');
@@ -1588,16 +1558,16 @@ function toggleDia(dataISO) {
   document.getElementById(`det_${dataISO}`).style.display = checked ? 'block' : 'none';
 }
 
-async function submeterDisponibilidade(modo) {
-  const isReaberta = modo === 'reaberta';
-  const {inicio} = isReaberta ? getSemanaAnterior() : getProximaSemana();
-  const msgId = isReaberta ? 'dispMsgReaberta' : 'dispMsg';
-  // Normalize to Tuesday
+async function submeterDisponibilidade() {
+  // Always use getProximaSemana to ensure semana_inicio is always Tuesday
+  const {inicio} = getProximaSemana();
+  // Normalize to Tuesday to prevent off-by-one errors
   const inicioNorm = new Date(inicio);
+  // Ensure it's a Tuesday (day 2)
   while (inicioNorm.getDay() !== 2) inicioNorm.setDate(inicioNorm.getDate() + 1);
   const dias = ['Terça','Quarta','Quinta','Sexta','Sábado','Domingo','Segunda'];
   const registos = [];
-  const obsGeral = document.getElementById(isReaberta ? 'dispObsReaberta' : 'dispObs').value.trim();
+  const obsGeral = document.getElementById('dispObs').value.trim();
   // Delete existing entries for this week first
   await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicioNorm)}`, {method:'DELETE', prefer:'return=minimal', headers:{}});
   dias.forEach((nome, i) => {
@@ -1611,18 +1581,19 @@ async function submeterDisponibilidade(modo) {
     registos.push({monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, semana_inicio:dateToISO(inicioNorm), dia:dataISO, periodo:per, parque, observacoes:obs});
   });
 
+  // If no days selected, create a "sem disponibilidade" record
   if (!registos.length) {
     registos.push({monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, semana_inicio:dateToISO(inicioNorm), dia:dateToISO(inicioNorm), periodo:'sem_disponibilidade', parque:null, observacoes:'Sem disponibilidade esta semana'});
   }
 
   try {
     await Promise.all(registos.map(r => db('disponibilidades', {method:'POST', body:r})));
-    document.getElementById(msgId).style.color='var(--green)';
-    document.getElementById(msgId).textContent='Disponibilidade atualizada com sucesso!';
+    document.getElementById('dispMsg').style.color='var(--green)';
+    document.getElementById('dispMsg').textContent='Disponibilidade atualizada com sucesso!';
     await iniciarDisponibilidade();
   } catch(e) {
-    document.getElementById(msgId).style.color='var(--red)';
-    document.getElementById(msgId).textContent='Erro ao submeter. Tente novamente.';
+    document.getElementById('dispMsg').style.color='var(--red)';
+    document.getElementById('dispMsg').textContent='Erro ao submeter. Tente novamente.';
   }
 }
 
@@ -2636,12 +2607,6 @@ function calcMin(e,s){const[eh,em]=e.split(':').map(Number),[sh,sm]=s.split(':')
 function minStr(m){return `${Math.floor(m/60)}h ${m%60}min`;}
 function fmtData(d){return d.split('-').reverse().join('/');}
 
-window.onerror = function(msg, src, line) {
-  const grid = document.getElementById('pinGrid');
-  const display = document.getElementById('pinDisplay');
-  if (grid) grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;font-size:12px;color:#922b21;padding:8px;">Erro JS (linha ${line})<br>${msg}</div>`;
-  if (display) { display.style.fontSize='13px'; display.textContent='Erro — contacte o administrador'; }
-};
 buildPin();
 </script>
 </body>
