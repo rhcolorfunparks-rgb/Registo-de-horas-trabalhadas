@@ -2345,7 +2345,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
 }
 
 // Route to correct profile function based on gestorTipo
-async async function abrirPerfilMonitor(monitorId, nomeMonitor) {
+async function abrirPerfilMonitor(monitorId, nomeMonitor) {
   if (gestorTipo === 'interno') {
     abrirPerfilColaborador(monitorId, nomeMonitor);
   } else {
@@ -2353,7 +2353,7 @@ async async function abrirPerfilMonitor(monitorId, nomeMonitor) {
   }
 }
 
-async async function reabrirFormularioMonitor() {
+async function reabrirFormularioMonitor() {
   const sel = document.getElementById('selReabrirMonitor');
   const msg = document.getElementById('reabrirMsg');
   if (!sel || !sel.value) {
