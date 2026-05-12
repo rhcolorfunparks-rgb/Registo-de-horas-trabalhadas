@@ -403,7 +403,7 @@
       <button class="tab" id="tabApr" onclick="mudarTab('aprovado')">Aprovados</button>
       <button class="tab" id="tabMon" onclick="mudarTab('monitores')">Gerir colaboradores</button>
       <button class="tab" id="tabAlertas" onclick="mudarTab('alertas')">Alertas <span id="badgeAlertas"></span></button>
-      <button class="tab" id="tabDisp" onclick="mudarTab('disponibilidades')" style="display:none;">Disponibilidades</button>
+
     </div>
     <div id="parqueFiltroSection" style="display:none;margin-bottom:0.5rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -934,9 +934,7 @@ async function iniciarGestor() {
   if (pfs) pfs.style.display = gestorTipo === 'monitores' ? 'block' : 'none';
   const ffs = document.getElementById('funcaoFiltroSection');
   if (ffs) ffs.style.display = gestorTipo === 'monitores' ? 'block' : 'none';
-  // Show disponibilidades tab for monitores
-  const tabDisp = document.getElementById('tabDisp');
-  if (tabDisp) tabDisp.style.display = gestorTipo === 'monitores' ? 'inline-block' : 'none';
+
   filtroParque = 'todos'; filtroFuncao = 'todas';
   // Show home screen
   const btnDispHome = document.getElementById('btnDisponibilidadesHome');
@@ -1016,7 +1014,7 @@ function mudarFiltroParque(p) {
   renderTab();
 }
 function atualizarTabs() {
-  [['tabPend','pendente'],['tabApr','aprovado'],['tabMon','monitores'],['tabAlertas','alertas'],['tabDisp','disponibilidades']].forEach(([id,v])=>{
+  [['tabPend','pendente'],['tabApr','aprovado'],['tabMon','monitores'],['tabAlertas','alertas']].forEach(([id,v])=>{
     document.getElementById(id).className = 'tab'+(tabAtiva===v?' ativo':'');
   });
 }
@@ -1024,7 +1022,6 @@ async function renderTab() {
   const el = document.getElementById('conteudoTab'); el.innerHTML='';
   if (tabAtiva==='monitores') { await renderMonitores(el); return; }
   if (tabAtiva==='alertas') { renderAlertas(el); return; }
-  if (tabAtiva==='disponibilidades') { renderDisponibilidades(el); return; }
   let regs = registosCache.filter(r=>r.estado===tabAtiva);
   if (gestorTipo==='monitores' && filtroParque !== 'todos') regs = regs.filter(r=>r.parque===filtroParque);
   if (gestorTipo==='monitores' && filtroFuncao !== 'todas') regs = regs.filter(r=>r.funcao===filtroFuncao);
@@ -2308,6 +2305,9 @@ function abrirSecaoGestor(secao) {
   document.getElementById('gestorSecaoDisp').style.display = secao==='disponibilidades' ? 'block' : 'none';
   if (secao === 'disponibilidades') {
     semanaOffset = 0;
+    filtroDispDia = 'todos'; filtroDispPer = 'todos'; filtroDispParque = 'todos';
+    horarioAlocado = {};
+    ['fPerManha','fPerTarde','fPerDiaInteiro'].forEach(id=>{ const el=document.getElementById(id); if(el) el.checked=false; });
     const el = document.getElementById('conteudoTabDisp');
     if (el) { el.innerHTML = ''; renderDisponibilidades(el); }
   } else {
