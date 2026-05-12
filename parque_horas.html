@@ -342,7 +342,7 @@
         <div id="dispSemanaInfoReaberta" style="font-size:13px;color:var(--muted);margin-bottom:1rem;"></div>
         <div id="dispDiasReaberta"></div>
         <input type="hidden" id="dispObsReaberta" value="">
-        <button onclick="submeterDisponibilidade('reaberta')" style="width:100%;margin-top:1rem;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:#92600A;color:#fff;font-family:'DM Sans',sans-serif;">Submeter semana anterior</button>
+        <button id="btnSubmeterReaberta" onclick="submeterDisponibilidade('reaberta')" style="width:100%;margin-top:1rem;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:#92600A;color:#fff;font-family:'DM Sans',sans-serif;">Submeter semana anterior</button>
         <p id="dispMsgReaberta" style="font-size:13px;text-align:center;margin-top:8px;min-height:18px;"></p>
       </div>
       <!-- Card semana atual/seguinte -->
@@ -351,7 +351,7 @@
         <div id="dispSemanaInfo" style="font-size:13px;color:var(--muted);margin-bottom:1rem;"></div>
         <div id="dispDias"></div>
         <input type="hidden" id="dispObs" value="">
-        <button onclick="submeterDisponibilidade('normal')" style="width:100%;margin-top:1rem;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Submeter disponibilidade</button>
+        <button id="btnSubmeterNormal" onclick="submeterDisponibilidade('normal')" style="width:100%;margin-top:1rem;padding:10px;font-size:14px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Submeter disponibilidade</button>
         <p id="dispMsg" style="font-size:13px;text-align:center;margin-top:8px;min-height:18px;"></p>
       </div>
       <div class="card">
@@ -1520,7 +1520,7 @@ async function iniciarDisponibilidade() {
         <p style="font-size:14px;font-weight:600;margin:0 0 4px;color:var(--text);">Formulário encerrado</p>
         <p style="font-size:13px;color:var(--muted);margin:0;">Um novo formulário estará disponível a partir de terça-feira.</p>
       </div>`;
-    const btnSubmeter = document.querySelector('[onclick="submeterDisponibilidade('normal')"]');
+    const btnSubmeter = document.getElementById("btnSubmeterNormal");
     const obsEl = document.getElementById('dispObs');
     if (btnSubmeter) btnSubmeter.style.display = 'none';
     if (obsEl) obsEl.style.display = 'none';
@@ -1535,10 +1535,10 @@ function renderDiasDisp(inicioSemana, existentes, jaSubmetido, modo) {
   const isReaberta = modo === 'reaberta';
   const elId = isReaberta ? 'dispDiasReaberta' : 'dispDias';
   const obsId = isReaberta ? 'dispObsReaberta' : 'dispObs';
-  const btnSel = isReaberta ? '[onclick="submeterDisponibilidade('reaberta')"]' : '[onclick="submeterDisponibilidade('normal')"]';
+  const btnSel = isReaberta ? 'btnSubmeterReaberta' : 'btnSubmeterNormal';
   const el = document.getElementById(elId);
   el.innerHTML = '';
-  const btnSubmeter = document.querySelector(btnSel);
+  const btnSubmeter = document.getElementById(btnSel);
   const obsEl = document.getElementById(obsId);
   if (obsEl) obsEl.style.display = 'block';
   if (btnSubmeter) {
