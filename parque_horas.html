@@ -1533,12 +1533,17 @@ function toggleDia(dataISO) {
 }
 
 async function submeterDisponibilidade() {
+  // Always use getProximaSemana to ensure semana_inicio is always Tuesday
   const {inicio} = getProximaSemana();
+  // Normalize to Tuesday to prevent off-by-one errors
+  const inicioNorm = new Date(inicio);
+  // Ensure it's a Tuesday (day 2)
+  while (inicioNorm.getDay() !== 2) inicioNorm.setDate(inicioNorm.getDate() + 1);
   const dias = ['Terça','Quarta','Quinta','Sexta','Sábado','Domingo','Segunda'];
   const registos = [];
   const obsGeral = document.getElementById('dispObs').value.trim();
   // Delete existing entries for this week first
-  await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicio)}`, {method:'DELETE', prefer:'return=minimal', headers:{}});
+  await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicioNorm)}`, {method:'DELETE', prefer:'return=minimal', headers:{}});
   dias.forEach((nome, i) => {
     const data = new Date(inicio); data.setDate(inicio.getDate()+i);
     const dataISO = dateToISO(data);
@@ -1547,12 +1552,12 @@ async function submeterDisponibilidade() {
     const per = document.querySelector(`input[name="per_${dataISO}_${monitorAtual.id}"]:checked`)?.value || 'dia_inteiro';
     const parque = document.querySelector(`input[name="parq_${dataISO}_${monitorAtual.id}"]:checked`)?.value || 'Ambos';
     const obs = document.getElementById(`obs_${dataISO}`)?.value.trim() || obsGeral || null;
-    registos.push({monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, semana_inicio:dateToISO(inicio), dia:dataISO, periodo:per, parque, observacoes:obs});
+    registos.push({monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, semana_inicio:dateToISO(inicioNorm), dia:dataISO, periodo:per, parque, observacoes:obs});
   });
 
   // If no days selected, create a "sem disponibilidade" record
   if (!registos.length) {
-    registos.push({monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, semana_inicio:dateToISO(inicio), dia:dateToISO(inicio), periodo:'sem_disponibilidade', parque:null, observacoes:'Sem disponibilidade esta semana'});
+    registos.push({monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, semana_inicio:dateToISO(inicioNorm), dia:dateToISO(inicioNorm), periodo:'sem_disponibilidade', parque:null, observacoes:'Sem disponibilidade esta semana'});
   }
 
   try {
