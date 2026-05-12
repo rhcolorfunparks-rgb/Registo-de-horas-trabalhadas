@@ -1424,6 +1424,15 @@ function getProximaSemana() {
   return {inicio: ter, fim: seg};
 }
 
+function getSemanaAnterior() {
+  const {inicio} = getProximaSemana();
+  const ter = new Date(inicio);
+  ter.setDate(ter.getDate() - 7);
+  const seg = new Date(ter);
+  seg.setDate(ter.getDate() + 6);
+  return {inicio: ter, fim: seg};
+}
+
 function dateToISO(d) { return d.toISOString().split('T')[0]; }
 function fmtDataSimples(d) { return d.toLocaleDateString('pt-PT', {day:'numeric', month:'long'}); }
 
@@ -1454,45 +1463,60 @@ function formularioBloqueado() {
 }
 
 async function iniciarDisponibilidade() {
-  const {inicio, fim} = getProximaSemana();
-  const semanaStr = `${fmtDataSimples(inicio)} a ${fmtDataSimples(fim)}`;
-  document.getElementById('dispSemanaInfo').textContent = `Semana de ${semanaStr}`;
-  // Clear form first to prevent browser cache from previous monitor
+  // Clear form first
   document.getElementById('dispDias').innerHTML = '<div class="loading">A carregar...</div>';
 
   // Reload monitor data to get fresh reaberto_ate
   const monitorData = await db(`monitores?id=eq.${monitorAtual.id}&select=reaberto_ate`) || [];
   if (monitorData.length) {
     monitorAtual.reaberto_ate = monitorData[0].reaberto_ate;
-    // Also update monitoresCache
     const cached = monitoresCache.find(m=>m.id===monitorAtual.id);
     if (cached) cached.reaberto_ate = monitorData[0].reaberto_ate;
   }
-  // Check if form is blocked (after Monday 23:59)
-  const bloqueado = formularioBloqueadoParaMonitor ? formularioBloqueadoParaMonitor() : formularioBloqueado();
+
+  // Determine which week to show:
+  // If monitor has a valid reaberto_ate, show the PREVIOUS week (the closed one that was reopened)
+  // Otherwise show the next/current open week
+  let semanaReaberta = false;
+  if (monitorAtual.reaberto_ate) {
+    const expiry = new Date(monitorAtual.reaberto_ate).getTime();
+    if (Date.now() < expiry) semanaReaberta = true;
+  }
+
   const btnSubmeter = document.querySelector('[onclick="submeterDisponibilidade()"]');
   const obsEl = document.getElementById('dispObs');
 
-  // Check if already submitted
-  const existentes = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicio)}&order=dia.asc`) || [];
-
-  if (bloqueado) {
-    document.getElementById('dispDias').innerHTML = `
-      <div style="background:#FFF9C4;border-radius:var(--radius-sm);padding:16px;text-align:center;margin-bottom:12px;">
-        <div style="font-size:24px;margin-bottom:8px;">⏰</div>
-        <p style="font-size:14px;font-weight:600;margin:0 0 4px;color:var(--text);">Formulário encerrado</p>
-        <p style="font-size:13px;color:var(--muted);margin:0;">Um novo formulário estará disponível a partir de terça-feira.</p>
-      </div>`;
-    document.getElementById('dispSemanaInfo').textContent = `Semana de ${semanaStr}`;
-    if (btnSubmeter) btnSubmeter.style.display = 'none';
-    if (obsEl) obsEl.style.display = 'none';
+  if (semanaReaberta) {
+    // Show the previous (closed) week that the gestor reopened
+    const {inicio, fim} = getSemanaAnterior();
+    const semanaStr = `${fmtDataSimples(inicio)} a ${fmtDataSimples(fim)}`;
+    document.getElementById('dispSemanaInfo').textContent = `Semana de ${semanaStr} ⚠️ reaberto pelo gestor`;
+    const existentes = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicio)}&order=dia.asc`) || [];
+    renderDiasDisp(inicio, existentes, existentes.length > 0, true);
   } else {
-    renderDiasDisp(inicio, existentes, existentes.length > 0);
+    // Normal flow — show next open week
+    const {inicio, fim} = getProximaSemana();
+    const semanaStr = `${fmtDataSimples(inicio)} a ${fmtDataSimples(fim)}`;
+    document.getElementById('dispSemanaInfo').textContent = `Semana de ${semanaStr}`;
+    const bloqueado = formularioBloqueadoParaMonitor ? formularioBloqueadoParaMonitor() : formularioBloqueado();
+    const existentes = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicio)}&order=dia.asc`) || [];
+    if (bloqueado) {
+      document.getElementById('dispDias').innerHTML = `
+        <div style="background:#FFF9C4;border-radius:var(--radius-sm);padding:16px;text-align:center;margin-bottom:12px;">
+          <div style="font-size:24px;margin-bottom:8px;">⏰</div>
+          <p style="font-size:14px;font-weight:600;margin:0 0 4px;color:var(--text);">Formulário encerrado</p>
+          <p style="font-size:13px;color:var(--muted);margin:0;">Um novo formulário estará disponível a partir de terça-feira.</p>
+        </div>`;
+      if (btnSubmeter) btnSubmeter.style.display = 'none';
+      if (obsEl) obsEl.style.display = 'none';
+    } else {
+      renderDiasDisp(inicio, existentes, existentes.length > 0, false);
+    }
   }
   await carregarHistoricoDisp();
 }
 
-function renderDiasDisp(inicioSemana, existentes, jaSubmetido) {
+function renderDiasDisp(inicioSemana, existentes, jaSubmetido, semanaReaberta) {
   const el = document.getElementById('dispDias');
   el.innerHTML = '';
   // Force browser to forget any cached form values
@@ -1546,8 +1570,13 @@ function toggleDia(dataISO) {
 }
 
 async function submeterDisponibilidade() {
-  // Always use getProximaSemana to ensure semana_inicio is always Tuesday
-  const {inicio} = getProximaSemana();
+  // Use correct week: if monitor was reopened, submit for previous week; otherwise next week
+  let semanaReaberta = false;
+  if (monitorAtual.reaberto_ate) {
+    const expiry = new Date(monitorAtual.reaberto_ate).getTime();
+    if (Date.now() < expiry) semanaReaberta = true;
+  }
+  const {inicio} = semanaReaberta ? getSemanaAnterior() : getProximaSemana();
   // Normalize to Tuesday to prevent off-by-one errors
   const inicioNorm = new Date(inicio);
   // Ensure it's a Tuesday (day 2)
@@ -2300,7 +2329,7 @@ function abrirPerfilMonitor(monitorId, nomeMonitor) {
   }
 }
 
-async function reabrirFormularioMonitor() {
+function reabrirFormularioMonitor() {
   const sel = document.getElementById('selReabrirMonitor');
   const msg = document.getElementById('reabrirMsg');
   if (!sel || !sel.value) {
