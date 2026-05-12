@@ -362,6 +362,23 @@
     <button class="btn-sair" onclick="sair()">Sair</button>
   </div>
   <div class="gestor-body">
+    <!-- Gestor Home Screen -->
+    <div id="gestorHome" style="display:none;padding:1rem 0;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:1rem;">
+        <button onclick="abrirSecaoGestor('ponto')" style="padding:32px 12px;font-size:15px;font-weight:600;cursor:pointer;border-radius:var(--radius);border:2px solid var(--accent);background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;align-items:center;gap:10px;">
+          <span style="font-size:32px;">⏱️</span>Controlo de Ponto
+        </button>
+        <button id="btnDisponibilidadesHome" onclick="abrirSecaoGestor('disponibilidades')" style="padding:32px 12px;font-size:15px;font-weight:600;cursor:pointer;border-radius:var(--radius);border:2px solid var(--border);background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;align-items:center;gap:10px;display:none;">
+          <span style="font-size:32px;">📅</span>Disponibilidades
+        </button>
+      </div>
+    </div>
+    <!-- Back button -->
+    <div id="gestorNavBack" style="display:none;margin-bottom:12px;">
+      <button onclick="voltarGestorHome()" style="background:none;border:none;font-size:13px;color:var(--muted);cursor:pointer;padding:0;">← Voltar</button>
+    </div>
+    <!-- Ponto section -->
+    <div id="gestorSecaoPonto" style="display:none;">
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">Pendentes</div><div class="stat-val pend" id="gPend">0</div></div>
       <div class="stat-card"><div class="stat-label">Aprovados</div><div class="stat-val ok" id="gApr">0</div></div>
@@ -405,6 +422,10 @@
     </div>
     <div class="card" style="padding: 0 1.25rem;">
       <div id="conteudoTab"><div class="loading">A carregar...</div></div>
+    </div>
+    </div><!-- fim gestorSecaoPonto -->
+    <div id="gestorSecaoDisp" style="display:none;">
+      <div id="conteudoTabDisp"></div>
     </div>
   </div>
 </div>
@@ -917,6 +938,13 @@ async function iniciarGestor() {
   const tabDisp = document.getElementById('tabDisp');
   if (tabDisp) tabDisp.style.display = gestorTipo === 'monitores' ? 'inline-block' : 'none';
   filtroParque = 'todos'; filtroFuncao = 'todas';
+  // Show home screen
+  const btnDispHome = document.getElementById('btnDisponibilidadesHome');
+  if (btnDispHome) btnDispHome.style.display = gestorTipo === 'monitores' ? 'flex' : 'none';
+  document.getElementById('gestorHome').style.display = 'block';
+  document.getElementById('gestorNavBack').style.display = 'none';
+  document.getElementById('gestorSecaoPonto').style.display = 'none';
+  document.getElementById('gestorSecaoDisp').style.display = 'none';
   const ano = new Date().getFullYear();
   const sm = document.getElementById('gMes'), sa = document.getElementById('gAno');
   sm.innerHTML = MESES.map((m,i)=>`<option value="${String(i+1).padStart(2,'0')}">${m}</option>`).join('');
@@ -1582,7 +1610,7 @@ async function renderDisponibilidades(el) {
 
 function navegarSemana(delta) {
   semanaOffset += delta;
-  const tabEl = document.getElementById('conteudoTab');
+  const tabEl = document.getElementById('conteudoTabDisp') || document.getElementById('conteudoTab');
   if (tabEl) { tabEl.innerHTML = ''; renderDisponibilidades(tabEl); }
 }
 
@@ -2266,6 +2294,27 @@ function reabrirFormularioMonitor() {
   reaberturasMonitor.add(monitorId);
   if (msg) { msg.style.color='var(--green)'; msg.textContent=`✅ Formulário reaberto para ${nomeMonitor}. Válido até ao próximo fecho.`; }
   setTimeout(() => { if (msg) msg.textContent=''; }, 4000);
+}
+
+function abrirSecaoGestor(secao) {
+  document.getElementById('gestorHome').style.display = 'none';
+  document.getElementById('gestorNavBack').style.display = 'block';
+  document.getElementById('gestorSecaoPonto').style.display = secao==='ponto' ? 'block' : 'none';
+  document.getElementById('gestorSecaoDisp').style.display = secao==='disponibilidades' ? 'block' : 'none';
+  if (secao === 'disponibilidades') {
+    semanaOffset = 0;
+    const el = document.getElementById('conteudoTabDisp');
+    if (el) { el.innerHTML = ''; renderDisponibilidades(el); }
+  } else {
+    mudarTab('pendente');
+  }
+}
+
+function voltarGestorHome() {
+  document.getElementById('gestorHome').style.display = 'block';
+  document.getElementById('gestorNavBack').style.display = 'none';
+  document.getElementById('gestorSecaoPonto').style.display = 'none';
+  document.getElementById('gestorSecaoDisp').style.display = 'none';
 }
 
 function gerarPinUnico() {
