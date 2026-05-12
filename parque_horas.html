@@ -2300,7 +2300,7 @@ function abrirPerfilMonitor(monitorId, nomeMonitor) {
   }
 }
 
-function reabrirFormularioMonitor() {
+async function reabrirFormularioMonitor() {
   const sel = document.getElementById('selReabrirMonitor');
   const msg = document.getElementById('reabrirMsg');
   if (!sel || !sel.value) {
