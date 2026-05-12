@@ -1391,12 +1391,12 @@ function mudarTabMonitor(tab) {
   }
 }
 
-let reaberturasMonitor = new Set(); // monitor IDs with reopened form
+let reaberturasMonitor = new Map(); // monitor ID -> expiry timestamp (24h)
 
 // Reset reaberturas on Tuesday
 (function() {
   const dow = new Date().getDay();
-  if (dow === 2) reaberturasMonitor.clear(); // Clear on Tuesday
+  if (dow === 2) reaberturasMonitor.clear(); // Clear expired on Tuesday
 })();
 
 function getSemanaComOffset(offset) {
@@ -1430,8 +1430,16 @@ function fmtDataSimples(d) { return d.toLocaleDateString('pt-PT', {day:'numeric'
 // Reopen overrides - gestor can reopen form for specific monitors
 function formularioBloqueadoParaMonitor() {
   if (!formularioBloqueado()) return false;
-  // Check if gestor reopened for this monitor
-  return !reaberturasMonitor.has(monitorAtual.id);
+  // Check Supabase reaberto_ate field via monitoresCache
+  const monitor = monitoresCache.find(m => m.id === monitorAtual.id);
+  if (monitor && monitor.reaberto_ate) {
+    const expiry = new Date(monitor.reaberto_ate).getTime();
+    if (Date.now() < expiry) return false; // still open
+  }
+  // Also check local memory
+  const expiry = reaberturasMonitor.get(monitorAtual.id);
+  if (expiry && Date.now() < expiry) return false;
+  return true;
 }
 
 function formularioBloqueado() {
@@ -1452,6 +1460,14 @@ async function iniciarDisponibilidade() {
   // Clear form first to prevent browser cache from previous monitor
   document.getElementById('dispDias').innerHTML = '<div class="loading">A carregar...</div>';
 
+  // Reload monitor data to get fresh reaberto_ate
+  const monitorData = await db(`monitores?id=eq.${monitorAtual.id}&select=reaberto_ate`) || [];
+  if (monitorData.length) {
+    monitorAtual.reaberto_ate = monitorData[0].reaberto_ate;
+    // Also update monitoresCache
+    const cached = monitoresCache.find(m=>m.id===monitorAtual.id);
+    if (cached) cached.reaberto_ate = monitorData[0].reaberto_ate;
+  }
   // Check if form is blocked (after Monday 23:59)
   const bloqueado = formularioBloqueadoParaMonitor ? formularioBloqueadoParaMonitor() : formularioBloqueado();
   const btnSubmeter = document.querySelector('[onclick="submeterDisponibilidade()"]');
@@ -1700,7 +1716,7 @@ function renderDispView(el, inicio, fim) {
         <button onclick="reabrirFormularioMonitor()" style="padding:6px 14px;font-size:13px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--accent);background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Reabrir</button>
       </div>
       <div id="reabrirMsg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
-      ${reaberturasMonitor.size > 0 ? `<p style="font-size:12px;color:var(--muted);margin-top:8px;">Reaberto para: ${[...reaberturasMonitor].map(id=>monitoresCache.find(m=>m.id===id)?.nome||id).join(', ')}</p>` : ''}`;
+      ${reaberturasMonitor.size > 0 ? `<p style="font-size:12px;color:var(--muted);margin-top:8px;">Reaberto para: ${[...reaberturasMonitor.entries()].map(([id,exp])=>{const nome=monitoresCache.find(m=>m.id===id)?.nome||id; const expiryStr=new Date(exp).toLocaleString('pt-PT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}); return `${nome} (até ${expiryStr})`;}).join(', ')}</p>` : ''}`;
     el.appendChild(reabrirDiv);
   }
 
@@ -2293,9 +2309,17 @@ function reabrirFormularioMonitor() {
   }
   const monitorId = sel.value;
   const nomeMonitor = monitoresCache.find(m=>m.id===monitorId)?.nome || '';
-  reaberturasMonitor.add(monitorId);
-  if (msg) { msg.style.color='var(--green)'; msg.textContent=`✅ Formulário reaberto para ${nomeMonitor}. Válido até ao próximo fecho.`; }
-  setTimeout(() => { if (msg) msg.textContent=''; }, 4000);
+  const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  reaberturasMonitor.set(monitorId, expiry.getTime());
+  try {
+    await db(`monitores?id=eq.${monitorId}`, {method:'PATCH', body:{reaberto_ate: expiry.toISOString()}, prefer:'return=minimal', headers:{}});
+    const expiryDate = expiry.toLocaleString('pt-PT', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    if (msg) { msg.style.color='var(--green)'; msg.textContent=`✅ Formulário reaberto para ${nomeMonitor} por 24h. Expira em ${expiryDate}.`; }
+    setTimeout(() => { if (msg) msg.textContent=''; }, 5000);
+    await carregarGestor();
+  } catch(e) {
+    if (msg) { msg.style.color='var(--red)'; msg.textContent='Erro ao reabrir. Tente novamente.'; }
+  }
 }
 
 function abrirSecaoGestor(secao) {
