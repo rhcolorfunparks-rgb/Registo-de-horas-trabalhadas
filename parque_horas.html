@@ -1917,13 +1917,34 @@ function limparAlocacao() {
 
 function renderDispTabela(container, datas, dias, inicio, dataIni) {
   container.innerHTML = '';
-  // Filter datas based on filtroDispDia
-  const datasVisiveis = filtroDispDia === 'todos' ? datas : datas.filter(d=>d===filtroDispDia);
-  const diasVisiveis = filtroDispDia === 'todos' ? dias : dias.filter((_,i)=>datas[i]===filtroDispDia);
+  // Filter columns: weekend days (Sábado/Domingo) show both columns together
+  const sabadoData = datas[4]; // index 4 = Sábado
+  const domingoData = datas[5]; // index 5 = Domingo
+  const isWeekend = filtroDispDia === sabadoData || filtroDispDia === domingoData;
+  let datasVisiveis, diasVisiveis;
+  if (filtroDispDia === 'todos') {
+    datasVisiveis = datas;
+    diasVisiveis = dias;
+  } else if (isWeekend) {
+    datasVisiveis = [sabadoData, domingoData];
+    diasVisiveis = ['Sábado', 'Domingo'];
+  } else {
+    datasVisiveis = datas.filter(d=>d===filtroDispDia);
+    diasVisiveis = dias.filter((_,i)=>datas[i]===filtroDispDia);
+  }
 
   // Filter disps
   let dispFiltradas = dispCache;
-  if (filtroDispDia !== 'todos') dispFiltradas = dispFiltradas.filter(d=>d.dia===filtroDispDia);
+  if (filtroDispDia !== 'todos') {
+    if (isWeekend) {
+      // Show monitors available on Sábado OR Domingo
+      const weekendDatas = [sabadoData, domingoData];
+      const monitoresComFimDeSemana = new Set(dispFiltradas.filter(d=>weekendDatas.includes(d.dia)).map(d=>d.monitor_nome));
+      dispFiltradas = dispFiltradas.filter(d=>monitoresComFimDeSemana.has(d.monitor_nome));
+    } else {
+      dispFiltradas = dispFiltradas.filter(d=>d.dia===filtroDispDia);
+    }
+  }
   if (filtroDispPer !== 'todos') {
     dispFiltradas = dispFiltradas.filter(d => {
       const periodos = Array.isArray(filtroDispPer) ? filtroDispPer : [filtroDispPer];
