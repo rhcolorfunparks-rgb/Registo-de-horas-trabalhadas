@@ -1933,11 +1933,24 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
     diasVisiveis = dias.filter((_,i)=>datas[i]===filtroDispDia);
   }
 
-  // Filter disps
+  // Filter disps — apply turno and parque first, then day/weekend
   let dispFiltradas = dispCache;
+
+  // 1. Filter by turno (exact match)
+  if (filtroDispPer !== 'todos') {
+    dispFiltradas = dispFiltradas.filter(d => {
+      const periodos = Array.isArray(filtroDispPer) ? filtroDispPer : [filtroDispPer];
+      if (d.periodo === 'dia_inteiro') return periodos.includes('dia_inteiro');
+      return periodos.includes(d.periodo);
+    });
+  }
+
+  // 2. Filter by parque
+  if (filtroDispParque !== 'todos') dispFiltradas = dispFiltradas.filter(d=>d.parque===filtroDispParque||d.parque==='Ambos');
+
+  // 3. Filter by day — for weekend show monitors available on Sábado OR Domingo (with matching turno)
   if (filtroDispDia !== 'todos') {
     if (isWeekend) {
-      // Show monitors available on Sábado OR Domingo
       const weekendDatas = [sabadoData, domingoData];
       const monitoresComFimDeSemana = new Set(dispFiltradas.filter(d=>weekendDatas.includes(d.dia)).map(d=>d.monitor_nome));
       dispFiltradas = dispFiltradas.filter(d=>monitoresComFimDeSemana.has(d.monitor_nome));
@@ -1945,15 +1958,6 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
       dispFiltradas = dispFiltradas.filter(d=>d.dia===filtroDispDia);
     }
   }
-  if (filtroDispPer !== 'todos') {
-    dispFiltradas = dispFiltradas.filter(d => {
-      const periodos = Array.isArray(filtroDispPer) ? filtroDispPer : [filtroDispPer];
-      // dia_inteiro matches both manha and tarde if selected
-      if (d.periodo === 'dia_inteiro') return periodos.includes('dia_inteiro');
-      return periodos.includes(d.periodo);
-    });
-  }
-  if (filtroDispParque !== 'todos') dispFiltradas = dispFiltradas.filter(d=>d.parque===filtroDispParque||d.parque==='Ambos');
 
   const monitoresVisiveis = [...new Set(dispFiltradas.map(d=>d.monitor_nome))].sort();
 
