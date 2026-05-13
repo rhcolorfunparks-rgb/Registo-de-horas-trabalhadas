@@ -1660,7 +1660,9 @@ async function carregarHistoricoDisp() {
 // ============ DISPONIBILIDADES GESTOR ============
 
 let dispCache = [];
-let semanaOffset = 0; // 0 = proxima semana, -1 = semana anterior, etc.
+let semanaOffset = 0; // 0 = semana atual, +1 = seguinte, -1 = anterior
+let semanaAtualDatas = []; // datas ISO da semana visível no mapa
+let semanaAtualDias = [];  // nomes dos dias da semana visível
 let filtroDispDia = 'todos';
 let filtroDispPer = 'todos';
 let filtroDispParque = 'todos';
@@ -1688,6 +1690,9 @@ function navegarSemana(delta) {
 function renderDispView(el, inicio, fim) {
   const dias = ['Terça','Quarta','Quinta','Sexta','Sábado','Domingo','Segunda'];
   const datas = dias.map((_,i)=>{ const d=new Date(inicio); d.setDate(inicio.getDate()+i); return dateToISO(d); });
+  // Save for use in aplicarFiltrosDisp
+  semanaAtualDatas = datas;
+  semanaAtualDias = dias;
   const nMon = new Set(dispCache.map(d=>d.monitor_nome)).size;
 
   el.innerHTML = '';
@@ -1785,9 +1790,10 @@ function aplicarFiltrosDisp() {
   if (document.getElementById('fPerDiaInteiro')?.checked) perSel.push('dia_inteiro');
   filtroDispPer = perSel.length ? perSel : 'todos';
   filtroDispParque = document.getElementById('fDispParque').value;
-  const {inicio} = getProximaSemana();
-  const dias = ['Terça','Quarta','Quinta','Sexta','Sábado','Domingo','Segunda'];
-  const datas = dias.map((_,i)=>{ const d=new Date(inicio); d.setDate(inicio.getDate()+i); return dateToISO(d); });
+  // Use the dates from the currently visible week
+  const {inicio} = getSemanaComOffset(semanaOffset);
+  const dias = semanaAtualDias.length ? semanaAtualDias : ['Terça','Quarta','Quinta','Sexta','Sábado','Domingo','Segunda'];
+  const datas = semanaAtualDatas.length ? semanaAtualDatas : dias.map((_,i)=>{ const d=new Date(inicio); d.setDate(inicio.getDate()+i); return dateToISO(d); });
   const container = document.getElementById('dispTabelaContainer');
   if (container) renderDispTabela(container, datas, dias, inicio, dateToISO(inicio));
 }
