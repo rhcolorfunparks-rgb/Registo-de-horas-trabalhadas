@@ -1917,50 +1917,35 @@ function limparAlocacao() {
 
 function renderDispTabela(container, datas, dias, inicio, dataIni) {
   container.innerHTML = '';
-  // Filter columns: weekend days (Sábado/Domingo) show both columns together
-  const sabadoData = datas[4]; // index 4 = Sábado
-  const domingoData = datas[5]; // index 5 = Domingo
-  const isWeekend = filtroDispDia === sabadoData || filtroDispDia === domingoData;
-  let datasVisiveis, diasVisiveis;
-  if (filtroDispDia === 'todos') {
-    datasVisiveis = datas;
-    diasVisiveis = dias;
-  } else if (isWeekend) {
-    datasVisiveis = [sabadoData, domingoData];
-    diasVisiveis = ['Sábado', 'Domingo'];
-  } else {
-    datasVisiveis = datas.filter(d=>d===filtroDispDia);
-    diasVisiveis = dias.filter((_,i)=>datas[i]===filtroDispDia);
-  }
+  // Sempre mostrar os 7 dias — o filtro de dia só afeta quais monitores aparecem
+  const datasVisiveis = datas;
+  const diasVisiveis = dias;
 
-  // Filter disps — turno e parque primeiro, depois dia
-  let dispFiltradas = dispCache;
+  const sabadoData = datas[4];
+  const domingoData = datas[5];
+  // Filtrar monitores por dia+turno+parque, depois mostrar os 7 dias desses monitores
+  let dispParaQualificar = dispCache;
 
-  // 1. Turno (correspondência exata)
+  // Turno (exato)
   if (filtroDispPer !== 'todos') {
-    dispFiltradas = dispFiltradas.filter(d => {
+    dispParaQualificar = dispParaQualificar.filter(d => {
       const periodos = Array.isArray(filtroDispPer) ? filtroDispPer : [filtroDispPer];
       if (d.periodo === 'dia_inteiro') return periodos.includes('dia_inteiro');
       return periodos.includes(d.periodo);
     });
   }
 
-  // 2. Parque
-  if (filtroDispParque !== 'todos') dispFiltradas = dispFiltradas.filter(d=>d.parque===filtroDispParque||d.parque==='Ambos');
+  // Parque
+  if (filtroDispParque !== 'todos') dispParaQualificar = dispParaQualificar.filter(d=>d.parque===filtroDispParque||d.parque==='Ambos');
 
-  // 3. Dia — fim de semana: mostrar monitores que têm turno correto no dia selecionado
-  //    mas mostrar ambos os dias (Sáb+Dom) para esses monitores
-  if (filtroDispDia !== 'todos') {
-    if (isWeekend) {
-      const weekendDatas = [sabadoData, domingoData];
-      // Monitores que passaram nos filtros de turno/parque para o dia selecionado especificamente
-      const monitoresValidos = new Set(dispFiltradas.filter(d=>d.dia===filtroDispDia).map(d=>d.monitor_nome));
-      // Mostrar todos os registos do fim de semana desses monitores (sem filtro de turno para o outro dia)
-      dispFiltradas = dispCache.filter(d=>weekendDatas.includes(d.dia) && monitoresValidos.has(d.monitor_nome));
-    } else {
-      dispFiltradas = dispFiltradas.filter(d=>d.dia===filtroDispDia);
-    }
-  }
+  // Dia
+  if (filtroDispDia !== 'todos') dispParaQualificar = dispParaQualificar.filter(d=>d.dia===filtroDispDia);
+
+  // Monitores que qualificam — mostrar todos os seus 7 dias
+  const monitoresQualificados = new Set(dispParaQualificar.map(d=>d.monitor_nome));
+  let dispFiltradas = (filtroDispDia !== 'todos' || filtroDispPer !== 'todos' || filtroDispParque !== 'todos')
+    ? dispCache.filter(d=>monitoresQualificados.has(d.monitor_nome))
+    : dispCache;
 
   const monitoresVisiveis = [...new Set(dispFiltradas.map(d=>d.monitor_nome))].sort();
 
