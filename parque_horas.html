@@ -1567,7 +1567,7 @@ function renderDiasDisp(inicioSemana, existentes, jaSubmetido, modo) {
     const data = new Date(inicioSemana);
     data.setDate(inicioSemana.getDate() + i);
     const dataISO = dateToISO(data);
-    const existing = existentes ? existentes.find(r=>r.dia===dataISO) : null;
+    const existing = existentes ? existentes.find(r=>r.dia===dataISO && r.periodo!=='sem_disponibilidade') : null;
     const div = document.createElement('div');
     div.style.cssText = 'border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;' + (existing ? 'border-color:#4caf7d;' : '');
     div.innerHTML = `
