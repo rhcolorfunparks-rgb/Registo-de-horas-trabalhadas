@@ -976,7 +976,7 @@ async function carregarGestor() {
   try {
     const equipaFiltro = gestorTipo === 'interno' ? '&equipa=eq.interno' : '&equipa=is.null&equipa=eq.monitores';
     const equipaQ = gestorTipo === 'interno' ? 'equipa=eq.interno' : 'or=(equipa.is.null,equipa.eq.monitores)';
-    registosCache = await db(`registos?data=gte.${dataInicio}&data=lt.${dataFim}&${equipaQ}&order=monitor_nome.asc,data.asc`) || [];
+    registosCache = await db(`registos?data=gte.${dataInicio}&data=lt.${dataFim}&${equipaQ}&order=data.asc,entrada.asc,monitor_nome.asc`) || [];
     monitoresCache = await db(`monitores?equipa=eq.${gestorTipo}&order=nome.asc`) || [];
     renderStats(); renderTab(); popularSelectorPDF();
   } catch(e) {
