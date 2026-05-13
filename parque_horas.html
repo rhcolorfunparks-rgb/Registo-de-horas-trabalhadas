@@ -1960,15 +1960,18 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
       <td style="padding:8px;border:1px solid var(--border);font-size:11px;color:var(--muted);">${parques||'—'}</td>
       <td style="padding:4px 8px;border:1px solid var(--border);"><input type="text" value="${obsAll||''}" placeholder="Adicionar observação..." onblur="guardarObsDisp(this, '${nome}', '${dataIni}')" style="width:100%;font-size:11px;padding:4px 6px;border:1px solid transparent;border-radius:4px;background:transparent;color:#c0392b;font-weight:600;" onfocus="this.style.border='1px solid var(--border)';this.style.background='var(--surface)'" onblur="this.style.border='1px solid transparent';this.style.background='transparent';guardarObsDisp(this,'${nome}','${dataIni}')"></td>
       ${datasVisiveis.map(data=>{
+        // Use full dispMonitor to find the entry for this day
         const d = dispMonitor.find(x=>x.dia===data);
         if(!d) return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:#fff5f5;color:#ccc;">—</td>`;
         if(d.periodo==='sem_disponibilidade') return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:#f5f5f5;color:#aaa;font-size:11px;">S/D</td>`;
-        // Hide cell if parque filter doesn't match
+        // Check if this entry matches active filters (turno + parque)
         const parqueMatch = filtroDispParque === 'todos' || d.parque === filtroDispParque || d.parque === 'Ambos';
-        if (!parqueMatch) return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:#fff5f5;color:#ccc;">—</td>`;
+        const turnoMatch = filtroDispPer === 'todos' || d.periodo === filtroDispPer || d.periodo === 'dia_inteiro';
         const perLabel = d.periodo==='manha'?'Manhã':d.periodo==='tarde'?'Tarde':'Todo o dia';
         const cor = d.periodo==='manha'?'#FFF9C4':d.periodo==='tarde'?'#BBDEFB':'#C8E6C9';
         const perShort = d.periodo==='manha'?'M':d.periodo==='tarde'?'T':'✓';
+        // Show coloured cell if matches filters, grey dash if not
+        if (!parqueMatch || !turnoMatch) return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:#f9f9f9;color:#ccc;" title="${perLabel} · ${d.parque||''} (fora do filtro)">—</td>`;
         return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:${cor};" title="${perLabel} · ${d.parque||''}${d.observacoes?' · '+d.observacoes:''}"><span style="font-weight:600;">${perShort}</span></td>`;
       }).join('')}`;
     tb.appendChild(tr);
