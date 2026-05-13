@@ -1675,7 +1675,7 @@ async function renderDisponibilidades(el) {
     dispCache = await db(`disponibilidades?semana_inicio=eq.${dataIni}&order=dia.asc,monitor_nome.asc`) || [];
     filtroDispDia = 'todos'; filtroDispPer = 'todos'; filtroDispParque = 'todos';
     horarioAlocado = {};
-    semanaOffset = 0; // reset to next week when opening tab
+    // semanaOffset mantém-se — só reseta ao abrir o tab de raiz
     ['fPerManha','fPerTarde','fPerDiaInteiro'].forEach(id=>{ const el=document.getElementById(id); if(el) el.checked=false; });
     renderDispView(el, inicio, fim);
   } catch(e) { el.innerHTML='<div class="empty">Erro ao carregar disponibilidades.</div>'; }
