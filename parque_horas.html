@@ -1928,7 +1928,7 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
     dispFiltradas = dispFiltradas.filter(d => {
       const periodos = Array.isArray(filtroDispPer) ? filtroDispPer : [filtroDispPer];
       // dia_inteiro matches both manha and tarde if selected
-      if (d.periodo === 'dia_inteiro') return periodos.includes('dia_inteiro') || periodos.includes('manha') || periodos.includes('tarde');
+      if (d.periodo === 'dia_inteiro') return periodos.includes('dia_inteiro');
       return periodos.includes(d.periodo);
     });
   }
