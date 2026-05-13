@@ -1933,10 +1933,10 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
     diasVisiveis = dias.filter((_,i)=>datas[i]===filtroDispDia);
   }
 
-  // Filter disps
+  // Filter disps — turno e parque primeiro, depois dia
   let dispFiltradas = dispCache;
 
-  // 1. Turno primeiro (correspondência exata)
+  // 1. Turno (correspondência exata)
   if (filtroDispPer !== 'todos') {
     dispFiltradas = dispFiltradas.filter(d => {
       const periodos = Array.isArray(filtroDispPer) ? filtroDispPer : [filtroDispPer];
@@ -1948,12 +1948,15 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
   // 2. Parque
   if (filtroDispParque !== 'todos') dispFiltradas = dispFiltradas.filter(d=>d.parque===filtroDispParque||d.parque==='Ambos');
 
-  // 3. Dia — para fim de semana mostra monitores com disponibilidade (já filtrada) em Sáb OU Dom
+  // 3. Dia — fim de semana: mostrar monitores que têm turno correto no dia selecionado
+  //    mas mostrar ambos os dias (Sáb+Dom) para esses monitores
   if (filtroDispDia !== 'todos') {
     if (isWeekend) {
       const weekendDatas = [sabadoData, domingoData];
-      const monitoresComFimDeSemana = new Set(dispFiltradas.filter(d=>weekendDatas.includes(d.dia)).map(d=>d.monitor_nome));
-      dispFiltradas = dispFiltradas.filter(d=>monitoresComFimDeSemana.has(d.monitor_nome));
+      // Monitores que passaram nos filtros de turno/parque para o dia selecionado especificamente
+      const monitoresValidos = new Set(dispFiltradas.filter(d=>d.dia===filtroDispDia).map(d=>d.monitor_nome));
+      // Mostrar todos os registos do fim de semana desses monitores (sem filtro de turno para o outro dia)
+      dispFiltradas = dispCache.filter(d=>weekendDatas.includes(d.dia) && monitoresValidos.has(d.monitor_nome));
     } else {
       dispFiltradas = dispFiltradas.filter(d=>d.dia===filtroDispDia);
     }
