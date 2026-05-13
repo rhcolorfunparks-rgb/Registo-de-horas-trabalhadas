@@ -1933,10 +1933,10 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
     diasVisiveis = dias.filter((_,i)=>datas[i]===filtroDispDia);
   }
 
-  // Filter disps — turno and parque first, then day
+  // Filter disps
   let dispFiltradas = dispCache;
 
-  // 1. Turno (exact match)
+  // 1. Turno primeiro (correspondência exata)
   if (filtroDispPer !== 'todos') {
     dispFiltradas = dispFiltradas.filter(d => {
       const periodos = Array.isArray(filtroDispPer) ? filtroDispPer : [filtroDispPer];
@@ -1948,7 +1948,7 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
   // 2. Parque
   if (filtroDispParque !== 'todos') dispFiltradas = dispFiltradas.filter(d=>d.parque===filtroDispParque||d.parque==='Ambos');
 
-  // 3. Dia / fim de semana
+  // 3. Dia — para fim de semana mostra monitores com disponibilidade (já filtrada) em Sáb OU Dom
   if (filtroDispDia !== 'todos') {
     if (isWeekend) {
       const weekendDatas = [sabadoData, domingoData];
