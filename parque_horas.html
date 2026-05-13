@@ -834,7 +834,7 @@ function renderListaMonitor(regs) {
     const parqueTag = r.parque ? ` · <span style='font-size:11px;font-weight:600;color:#555;'>${r.parque}</span>` : '';
     const horasInfo = tipoDia ? `<strong>${tipoDia}</strong>` : `${r.entrada||'—'} → ${r.saida||'—'} · <strong>${h}</strong>${parqueTag}`;
     const pausaInfo = r.pausa_inicio && r.pausa_fim ? ` · Pausa: ${r.pausa_inicio}–${r.pausa_fim}` : '';
-    const obsInfo = r.observacoes ? `<span style="font-size:11px;color:#c0392b;display:block;margin-top:2px;">📝 ${r.observacoes}</span>` : '';
+    const obsInfo = r.observacoes ? `<span style="font-size:11px;color:var(--muted);display:block;margin-top:2px;">📝 ${r.observacoes}</span>` : '';
     const alertaInfo = r.alerta ? `<span style="font-size:11px;color:#A32D2D;display:block;margin-top:2px;">⚠️ Erro reportado: ${r.alerta}</span>` : '';
     const btnReportar = !r.alerta && est !== 'rejeitado' ? `<button onclick="abrirReportarErro('${r.id}')" style="font-size:11px;padding:2px 8px;cursor:pointer;border-radius:8px;color:#888;border:0.5px solid #ccc;background:transparent;margin-top:6px;">⚠️ Reportar erro</button>` : '';
     d.innerHTML = `<span style="font-size:13px;color:var(--muted)">${fmtData(r.data)}</span><div style="font-size:13px;">${horasInfo}${pausaInfo}${obsInfo}${alertaInfo}${btnReportar}</div>${fc?`<span style="font-size:12px;font-weight:600;color:var(--accent);background:var(--bg);padding:2px 8px;border-radius:20px;">${fc}</span>`:''}<span class="badge badge-${est==='aprovado'?'ok':est==='rejeitado'?'rej':'pend'}">${est==='aprovado'?'Aprovado':est==='rejeitado'?'Rejeitado':'Pendente'}</span>`;
@@ -1075,7 +1075,7 @@ async function renderTab() {
     const parqueLabel = r.parque ? ` <span style='font-size:11px;font-weight:600;background:#f0f0f0;padding:1px 6px;border-radius:10px;'>${r.parque}</span>` : '';
     const tipoDiaLabel = r.tipo_dia && r.tipo_dia !== 'normal' ? ` <span class="badge badge-pend">${r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1)}</span>` : '';
     const pausaLabel = r.pausa_inicio && r.pausa_fim ? `<br><span style="font-size:11px;color:var(--muted);">Pausa: ${r.pausa_inicio}–${r.pausa_fim}</span>` : '';
-    const obsLabel = r.observacoes ? `<br><span style="font-size:11px;color:#c0392b;">📝 ${r.observacoes}</span>` : '';
+    const obsLabel = r.observacoes ? `<br><span style="font-size:11px;color:var(--muted);">📝 ${r.observacoes}</span>` : '';
     const aviso40h = gestorTipo==='interno' && temSemana40h(r.monitor_nome) ? ' <span title="Ultrapassa 40h semanais!" style="font-size:13px;">⚠️</span>' : '';
     tr.innerHTML=`<td><strong>${r.monitor_nome}</strong>${aviso40h}</td><td>${fmtData(r.data)}${tipoDiaLabel}</td><td><span style="font-size:12px;font-weight:600;background:var(--bg);padding:2px 8px;border-radius:20px;">${r.funcao||'—'}</span>${parqueLabel}</td><td>${r.entrada||'—'}${pausaLabel}</td><td>${r.saida||'—'}</td><td><strong>${h}</strong>${obsLabel}</td><td><div class="acoes">${ac}</div></td>`;
     tb.appendChild(tr);
@@ -1958,7 +1958,7 @@ function renderDispTabela(container, datas, dias, inicio, dataIni) {
     tr.innerHTML=`
       <td style="padding:8px;border:1px solid var(--border);font-weight:500;">${nome}</td>
       <td style="padding:8px;border:1px solid var(--border);font-size:11px;color:var(--muted);">${parques||'—'}</td>
-      <td style="padding:4px 8px;border:1px solid var(--border);"><input type="text" value="${obsAll||''}" placeholder="Adicionar observação..." onblur="guardarObsDisp(this, '${nome}', '${dataIni}')" style="width:100%;font-size:11px;padding:4px 6px;border:1px solid transparent;border-radius:4px;background:transparent;color:var(--text);" onfocus="this.style.border='1px solid var(--border)';this.style.background='var(--surface)'" onblur="this.style.border='1px solid transparent';this.style.background='transparent';guardarObsDisp(this,'${nome}','${dataIni}')"></td>
+      <td style="padding:4px 8px;border:1px solid var(--border);"><input type="text" value="${obsAll||''}" placeholder="Adicionar observação..." onblur="guardarObsDisp(this, '${nome}', '${dataIni}')" style="width:100%;font-size:11px;padding:4px 6px;border:1px solid transparent;border-radius:4px;background:transparent;color:#c0392b;font-weight:600;" onfocus="this.style.border='1px solid var(--border)';this.style.background='var(--surface)'" onblur="this.style.border='1px solid transparent';this.style.background='transparent';guardarObsDisp(this,'${nome}','${dataIni}')"></td>
       ${datasVisiveis.map(data=>{
         const d = dispMonitor.find(x=>x.dia===data);
         if(!d) return `<td style="padding:8px;border:1px solid var(--border);text-align:center;background:#fff5f5;color:#ccc;">—</td>`;
