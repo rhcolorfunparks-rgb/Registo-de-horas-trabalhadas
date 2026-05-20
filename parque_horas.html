@@ -1404,7 +1404,7 @@ function mudarTabMonitor(tab) {
   }
 }
 
-let reaberturasMonitor = new Map(); // monitor ID -> expiry timestamp (24h)
+let reaberturasMonitor = new Map(); // monitor ID -> expiry timestamp (6h)
 
 // Reset reaberturas on Tuesday
 (function() {
@@ -1771,6 +1771,7 @@ function renderDispView(el, inicio, fim) {
           ${monitoresCache.filter(m=>m.equipa==='monitores').sort((a,b)=>a.nome.localeCompare(b.nome)).map(m=>`<option value="${m.id}">${m.nome}</option>`).join('')}
         </select>
         <button onclick="reabrirFormularioMonitor()" style="padding:6px 14px;font-size:13px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--accent);background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;">Reabrir</button>
+        <button onclick="encerrarFormularioMonitor()" style="padding:6px 14px;font-size:13px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid #c0392b;background:#c0392b;color:#fff;font-family:'DM Sans',sans-serif;">Encerrar</button>
       </div>
       <div id="reabrirMsg" style="font-size:12px;margin-top:6px;min-height:16px;"></div>
       ${reaberturasMonitor.size > 0 ? `<p style="font-size:12px;color:var(--muted);margin-top:8px;">Reaberto para: ${[...reaberturasMonitor.entries()].map(([id,exp])=>{const nome=monitoresCache.find(m=>m.id===id)?.nome||id; const expiryStr=new Date(exp).toLocaleString('pt-PT',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}); return `${nome} (até ${expiryStr})`;}).join(', ')}</p>` : ''}`;
@@ -2377,16 +2378,36 @@ async function reabrirFormularioMonitor() {
   }
   const monitorId = sel.value;
   const nomeMonitor = monitoresCache.find(m=>m.id===monitorId)?.nome || '';
-  const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const expiry = new Date(Date.now() + 6 * 60 * 60 * 1000);
   reaberturasMonitor.set(monitorId, expiry.getTime());
   try {
     await db(`monitores?id=eq.${monitorId}`, {method:'PATCH', body:{reaberto_ate: expiry.toISOString()}, prefer:'return=minimal', headers:{}});
     const expiryDate = expiry.toLocaleString('pt-PT', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
-    if (msg) { msg.style.color='var(--green)'; msg.textContent=`✅ Formulário reaberto para ${nomeMonitor} por 24h. Expira em ${expiryDate}.`; }
+    if (msg) { msg.style.color='var(--green)'; msg.textContent=`✅ Formulário reaberto para ${nomeMonitor} por 6h. Expira em ${expiryDate}.`; }
     setTimeout(() => { if (msg) msg.textContent=''; }, 5000);
     await carregarGestor();
   } catch(e) {
     if (msg) { msg.style.color='var(--red)'; msg.textContent='Erro ao reabrir. Tente novamente.'; }
+  }
+}
+
+async function encerrarFormularioMonitor() {
+  const sel = document.getElementById('selReabrirMonitor');
+  const msg = document.getElementById('reabrirMsg');
+  if (!sel || !sel.value) {
+    if (msg) { msg.style.color='var(--red)'; msg.textContent='Selecione um monitor.'; }
+    return;
+  }
+  const monitorId = sel.value;
+  const nomeMonitor = monitoresCache.find(m=>m.id===monitorId)?.nome || '';
+  reaberturasMonitor.delete(monitorId);
+  try {
+    await db(`monitores?id=eq.${monitorId}`, {method:'PATCH', body:{reaberto_ate: null}, prefer:'return=minimal', headers:{}});
+    if (msg) { msg.style.color='var(--green)'; msg.textContent=`✅ Formulário encerrado para ${nomeMonitor}.`; }
+    setTimeout(() => { if (msg) msg.textContent=''; }, 5000);
+    await carregarGestor();
+  } catch(e) {
+    if (msg) { msg.style.color='var(--red)'; msg.textContent='Erro ao encerrar. Tente novamente.'; }
   }
 }
 
