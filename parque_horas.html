@@ -1649,8 +1649,7 @@ async function carregarHistoricoDisp() {
       const linhas = dias.sort((a,b)=>a.dia.localeCompare(b.dia)).map(d=>{
         const per = d.periodo==='manha'?'Manhã':d.periodo==='tarde'?'Tarde':d.periodo==='dia_inteiro'?'Dia inteiro':'Sem disponibilidade';
         const parq = d.parque ? ` · ${d.parque}` : '';
-        const obs = d.observacoes?` · <em>${d.observacoes}</em>`:'';
-        return `<div style="font-size:13px;padding:4px 0;border-bottom:0.5px solid var(--border);">${fmtData(d.dia)} — ${per}${parq}${obs}</div>`;
+        return `<div style="font-size:13px;padding:4px 0;border-bottom:0.5px solid var(--border);">${fmtData(d.dia)} — ${per}${parq}</div>`;
       }).join('');
       return `<div style="margin-bottom:1rem;"><p style="font-size:13px;font-weight:600;margin:0 0 6px;">Semana de ${semFmt}</p>${linhas}</div>`;
     }).join('');
