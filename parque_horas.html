@@ -311,14 +311,14 @@
         <button onclick="mudarTabMonitor('registo')" style="padding:24px 12px;font-size:15px;font-weight:600;cursor:pointer;border-radius:var(--radius);border:2px solid var(--accent);background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;align-items:center;gap:8px;">
           <span style="font-size:28px;">⏱️</span>Registar horas
         </button>
-        <button onclick="mudarTabMonitor('disponibilidade')" style="padding:24px 12px;font-size:15px;font-weight:600;cursor:pointer;border-radius:var(--radius);border:2px solid var(--border);background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;align-items:center;gap:8px;">
+        <button id="btnDispHomeMonitor" onclick="mudarTabMonitor('disponibilidade')" style="padding:24px 12px;font-size:15px;font-weight:600;cursor:pointer;border-radius:var(--radius);border:2px solid var(--border);background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;flex-direction:column;align-items:center;gap:8px;">
           <span style="font-size:28px;">📅</span>Disponibilidade
         </button>
       </div>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap;display:none;" id="mTabsRow">
       <button class="tab ativo" id="mTabRegisto" onclick="mudarTabMonitor('registo')">Registar horas</button>
-      <button class="tab" id="mTabDisp" onclick="mudarTabMonitor('disponibilidade')">Disponibilidade</button>
+      <button class="tab" id="mTabDisp" onclick="mudarTabMonitor('disponibilidade')" style="display:none;">Disponibilidade</button>
     </div>
     <div id="mSecaoRegisto">
     <div id="totalFuncaoMonitor" style="display:none;margin-bottom:1rem;"></div>
@@ -669,7 +669,11 @@ async function iniciarMonitor() {
   tabMonitorAtiva = 'home';
   mudarTabMonitor('home');
   const isInterno = monitorAtual.equipa === 'interno';
-  // Funcao + parque sections (monitores only)
+  // Hide disponibilidade button for equipa interna
+  const btnDispHome = document.getElementById('btnDispHomeMonitor');
+  if (btnDispHome) btnDispHome.style.display = isInterno ? 'none' : 'flex';
+  const tabDisp = document.getElementById('mTabDisp');
+  if (tabDisp) tabDisp.style.display = isInterno ? 'none' : 'block';
   const fs = document.getElementById('funcaoSection');
   if (fs) fs.style.display = isInterno ? 'none' : 'block';
   const ps = document.getElementById('parqueSection');
