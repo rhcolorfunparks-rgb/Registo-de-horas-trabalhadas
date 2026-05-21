@@ -913,7 +913,7 @@ async function submeterRegisto() {
     // Folga / Férias / Feriado
     const obs = document.getElementById('mObs') ? document.getElementById('mObs').value.trim() || null : null;
     try {
-      await db('registos', {method:'POST', body:{monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, data, entrada:null, saida:null, equipa, tipo_dia:tipoDia, observacoes:obs, estado:'pendente'}});
+      await db('registos', {method:'POST', body:{monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, data, entrada:null, saida:null, equipa, funcao:null, parque:null, tipo_dia:tipoDia, observacoes:obs, estado:'pendente'}});
       err.style.color = 'var(--green)'; err.textContent = 'Registo submetido com sucesso!';
       if (document.getElementById('mObs')) document.getElementById('mObs').value = '';
       prev.textContent = '';
@@ -922,7 +922,17 @@ async function submeterRegisto() {
       if (normalRadio) { normalRadio.checked = true; document.getElementById('horasSection').style.display = 'block'; }
       setTimeout(() => { err.textContent = ''; err.style.color = 'var(--red)'; }, 3000);
       await carregarMonitor();
-    } catch(e) { err.textContent = 'Erro ao guardar. Tente novamente.'; }
+    } catch(e) {
+      // Check if record was actually saved despite the error
+      const verificar = await db(`registos?monitor_id=eq.${monitorAtual.id}&data=eq.${data}&tipo_dia=eq.${tipoDia}`) || [];
+      if (verificar.length > 0) {
+        err.style.color = 'var(--green)';
+        err.textContent = 'Registo guardado com sucesso!';
+        await carregarMonitor();
+      } else {
+        err.textContent = 'Erro ao guardar. Tente novamente.';
+      }
+    }
   }
 }
 
