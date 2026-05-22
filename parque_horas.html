@@ -2315,7 +2315,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       const seg = new Date(d); seg.setDate(d.getDate()-dow);
       const semKey = dateToISO(seg);
       if (!semanas[semKey]) semanas[semKey] = {regs:[], mins:0};
-      const bruto = calcMin(r.entrada,r.saida);
+      const bruto = r.entrada && r.saida ? calcMin(r.entrada,r.saida) : 0;
       const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
       const liq = Math.max(bruto-pausa,0);
       semanas[semKey].regs.push(r);
@@ -2341,10 +2341,14 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
             const pausa=r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
             const liq=Math.max(bruto-pausa,0);
             const tipoDia = r.tipo_dia&&r.tipo_dia!=='normal'?` · ${r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1)}`:'';
+            const horasStr = r.entrada && r.saida
+              ? `${r.entrada}–${r.saida}${r.pausa_inicio?` · Pausa: ${r.pausa_inicio}-${r.pausa_fim}`:''}`
+              : (r.tipo_dia && r.tipo_dia !== 'normal' ? r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1) : '—');
+            const minsStr = liq > 0 ? `${Math.floor(liq/60)}h ${liq%60}min` : '—';
             return `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:2px 0;border-top:0.5px solid var(--border);">
               <span>${fmtData(r.data)}${tipoDia}</span>
-              <span>${r.entrada}–${r.saida}${r.pausa_inicio?` · Pausa: ${r.pausa_inicio}-${r.pausa_fim}`:''}</span>
-              <span style="font-weight:500;">${Math.floor(liq/60)}h ${liq%60}min</span>
+              <span>${horasStr}</span>
+              <span style="font-weight:500;">${minsStr}</span>
             </div>`;
           }).join('')}
         </div>`;
@@ -2355,7 +2359,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
     meses.slice(1).forEach(m => {
       const regsM2 = regs.filter(r=>r.data>=m.inicio&&r.data<=m.fim);
       const totalMins = regsM2.reduce((acc,r)=>{
-        const bruto=calcMin(r.entrada,r.saida);
+        const bruto=r.entrada&&r.saida?calcMin(r.entrada,r.saida):0;
         const pausa=r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
         return acc+Math.max(bruto-pausa,0);
       },0);
