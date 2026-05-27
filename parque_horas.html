@@ -416,7 +416,11 @@
       <button class="tab" id="tabApr" onclick="mudarTab('aprovado')">Aprovados</button>
       <button class="tab" id="tabMon" onclick="mudarTab('monitores')">Gerir colaboradores</button>
       <button class="tab" id="tabAlertas" onclick="mudarTab('alertas')">Alertas <span id="badgeAlertas"></span></button>
-
+    </div>
+    <div id="filtroColabDiv" style="display:none;margin-bottom:12px;">
+      <select id="filtroColabSelect" onchange="renderTab()" style="font-size:13px;padding:7px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;">
+        <option value="todos">Todos os colaboradores</option>
+      </select>
     </div>
     <div id="parqueFiltroSection" style="display:none;margin-bottom:0.5rem;">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -1052,6 +1056,23 @@ async function renderTab() {
   let regs = registosCache.filter(r=>r.estado===tabAtiva);
   if (gestorTipo==='monitores' && filtroParque !== 'todos') regs = regs.filter(r=>r.parque===filtroParque);
   if (gestorTipo==='monitores' && filtroFuncao !== 'todas') regs = regs.filter(r=>r.funcao===filtroFuncao);
+  // Filtro por colaborador (equipa interna, tab aprovados)
+  const filtroColabDiv = document.getElementById('filtroColabDiv');
+  const filtroColabSelect = document.getElementById('filtroColabSelect');
+  if (gestorTipo === 'interno' && tabAtiva === 'aprovado') {
+    if (filtroColabDiv) filtroColabDiv.style.display = 'block';
+    // Populate select with colaboradores from current registos
+    const nomes = [...new Set(registosCache.filter(r=>r.estado==='aprovado').map(r=>r.monitor_nome))].sort();
+    if (filtroColabSelect) {
+      const sel = filtroColabSelect.value;
+      filtroColabSelect.innerHTML = '<option value="todos">Todos os colaboradores</option>' +
+        nomes.map(n=>`<option value="${n}"${n===sel?' selected':''}>${n}</option>`).join('');
+    }
+    const selColab = filtroColabSelect ? filtroColabSelect.value : 'todos';
+    if (selColab !== 'todos') regs = regs.filter(r=>r.monitor_nome===selColab);
+  } else {
+    if (filtroColabDiv) filtroColabDiv.style.display = 'none';
+  }
   if (!regs.length) { el.innerHTML=`<div class="empty">Sem registos ${tabAtiva==='pendente'?'pendentes':tabAtiva==='aprovado'?'aprovados':'rejeitados'} neste período.</div>`; return; }
   // Calculate weekly hours per collaborator for equipa interna warning
   const horasSemanais = {};
