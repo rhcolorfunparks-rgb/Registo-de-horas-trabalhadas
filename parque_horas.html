@@ -2337,7 +2337,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
             <span style="font-size:13px;font-weight:600;color:${over40?'#A32D2D':'var(--text)'};">${Math.floor(s.mins/60)}h ${s.mins%60}min${over40?' ⚠️':''}</span>
           </div>
           ${s.regs.map(r=>{
-            const bruto=calcMin(r.entrada,r.saida);
+            const bruto=r.entrada&&r.saida?calcMin(r.entrada,r.saida):0;
             const pausa=r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
             const liq=Math.max(bruto-pausa,0);
             const tipoDia = r.tipo_dia&&r.tipo_dia!=='normal'?` · ${r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1)}`:'';
