@@ -2655,21 +2655,27 @@ function gerarFolhasPontoPDF() {
     for (let d = 1; d <= diasMes; d++) {
       const dataISO = `${ano}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const dataFmt = `${String(d).padStart(2,'0')}-${String(mes).padStart(2,'0')}-${ano}`;
-      const reg = regs.find(r=>r.data===dataISO);
-      if (reg) {
-        const tipoDia = reg.tipo_dia && reg.tipo_dia !== 'normal' ? reg.tipo_dia : null;
-        if (tipoDia) {
-          rows.push(`<tr><td>${dataFmt}</td><td colspan="4" class="tipo-especial">${tipoDia.charAt(0).toUpperCase()+tipoDia.slice(1)}</td><td>0:00</td><td class="obs-cell">${reg.observacoes||''}</td></tr>`);
+      const diaDados = regs.filter(r=>r.data===dataISO);
+      if (diaDados.length) {
+        // Check for tipo especial (ferias/folga) - only one record expected
+        const tipoDia = diaDados[0].tipo_dia && diaDados[0].tipo_dia !== 'normal' ? diaDados[0].tipo_dia : null;
+        if (tipoDia && !diaDados[0].entrada) {
+          rows.push(`<tr><td>${dataFmt}</td><td colspan="4" class="tipo-especial">${tipoDia.charAt(0).toUpperCase()+tipoDia.slice(1)}</td><td>0:00</td><td class="obs-cell">${diaDados[0].observacoes||''}</td></tr>`);
         } else {
-          const min = reg.entrada&&reg.saida?calcMin(reg.entrada,reg.saida):0;
-          const pausaMin = reg.pausa_inicio&&reg.pausa_fim?calcMin(reg.pausa_inicio,reg.pausa_fim):0;
-          const liq = Math.max(min-pausaMin, 0);
-          totalMin += liq; diasTrab++;
-          if (isInterno) {
-            rows.push(`<tr><td>${dataFmt}</td><td>${reg.entrada||''}</td><td>${reg.pausa_inicio||''}</td><td>${reg.pausa_fim||''}</td><td>${reg.saida||''}</td><td>${Math.floor(liq/60)}:${String(liq%60).padStart(2,'0')}</td><td class="obs-cell">${reg.observacoes||''}</td></tr>`);
-          } else {
-            rows.push(`<tr><td>${dataFmt}</td><td>${reg.funcao||'—'}</td><td>${reg.parque||'—'}</td><td>${reg.entrada||''}</td><td>${reg.saida||''}</td><td>${Math.floor(liq/60)}:${String(liq%60).padStart(2,'0')}</td><td class="obs-cell">${reg.observacoes||''}</td></tr>`);
-          }
+          // Can have multiple records per day (different functions)
+          let firstRow = true;
+          diaDados.forEach(reg => {
+            const min = reg.entrada&&reg.saida?calcMin(reg.entrada,reg.saida):0;
+            const pausaMin = reg.pausa_inicio&&reg.pausa_fim?calcMin(reg.pausa_inicio,reg.pausa_fim):0;
+            const liq = Math.max(min-pausaMin, 0);
+            totalMin += liq;
+            if (firstRow) { diasTrab++; firstRow = false; }
+            if (isInterno) {
+              rows.push(`<tr><td>${dataFmt}</td><td>${reg.entrada||''}</td><td>${reg.pausa_inicio||''}</td><td>${reg.pausa_fim||''}</td><td>${reg.saida||''}</td><td>${Math.floor(liq/60)}:${String(liq%60).padStart(2,'0')}</td><td class="obs-cell">${reg.observacoes||''}</td></tr>`);
+            } else {
+              rows.push(`<tr><td>${dataFmt}</td><td>${reg.funcao||'—'}</td><td>${reg.parque||'—'}</td><td>${reg.entrada||''}</td><td>${reg.saida||''}</td><td>${Math.floor(liq/60)}:${String(liq%60).padStart(2,'0')}</td><td class="obs-cell">${reg.observacoes||''}</td></tr>`);
+            }
+          });
         }
       } else {
         if (isInterno) {
