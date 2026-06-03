@@ -995,7 +995,8 @@ async function carregarGestor() {
     const equipaFiltro = gestorTipo === 'interno' ? '&equipa=eq.interno' : '&equipa=is.null&equipa=eq.monitores';
     const equipaQ = gestorTipo === 'interno' ? 'equipa=eq.interno' : 'or=(equipa.is.null,equipa.eq.monitores)';
     registosCache = await db(`registos?data=gte.${dataInicio}&data=lt.${dataFim}&${equipaQ}&order=data.asc,entrada.asc,monitor_nome.asc`) || [];
-    monitoresCache = await db(`monitores?equipa=eq.${gestorTipo}&order=nome.asc`) || [];
+    const monitoresQ = gestorTipo === 'interno' ? 'equipa=eq.interno' : 'or=(equipa.is.null,equipa.eq.monitores)';
+    monitoresCache = await db(`monitores?${monitoresQ}&order=nome.asc`) || [];
     renderStats(); renderTab(); popularSelectorPDF();
   } catch(e) {
     console.error('Erro carregarGestor:', e);
