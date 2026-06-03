@@ -448,7 +448,7 @@
 </div>
 
 <!-- MODAL EDITAR -->
-<div class="modal-overlay" id="modalAlertaMonitorOverlay">
+<div class="modal-overlay" id="modalAlertaMonitorOverlay" onclick="if(event.target===this)fecharTodosModais()">
   <div class="modal-box">
     <div style="font-size:24px;text-align:center;margin-bottom:8px;">⚠️</div>
     <div class="modal-title" style="text-align:center;">Tens um alerta do gestor</div>
@@ -459,7 +459,7 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="modalPerfilOverlay" style="align-items:flex-start;padding-top:2rem;">
+<div class="modal-overlay" id="modalPerfilOverlay" onclick="if(event.target===this)fecharTodosModais()" style="align-items:flex-start;padding-top:2rem;">
   <div class="modal-box" style="max-width:520px;width:100%;max-height:85vh;overflow-y:auto;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;">
       <div class="modal-title" id="perfilNome" style="margin:0;"></div>
@@ -469,7 +469,7 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="modalAlocacaoOverlay">
+<div class="modal-overlay" id="modalAlocacaoOverlay" onclick="if(event.target===this)fecharTodosModais()">
   <div class="modal-box">
     <div class="modal-title">Alocar horário</div>
     <div class="modal-sub" id="alocacaoNome"></div>
@@ -504,7 +504,7 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="modalAlertaGestorOverlay">
+<div class="modal-overlay" id="modalAlertaGestorOverlay" onclick="if(event.target===this)fecharTodosModais()">
   <div class="modal-box">
     <div class="modal-title">Enviar alerta ao monitor</div>
     <div class="modal-sub" id="alertaGestorNome"></div>
@@ -536,7 +536,7 @@
   </div>
 </div>
 
-<div class="modal-overlay" id="modalOverlay">
+<div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)fecharTodosModais()">
   <div class="modal-box">
     <div class="modal-title">Editar registo</div>
     <div class="modal-sub" id="modalSub"></div>
@@ -2737,6 +2737,16 @@ window.onerror = function(msg, src, line) {
   if (grid) grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;font-size:12px;color:#922b21;padding:8px;">Erro JS (linha ${line})<br>${msg}</div>`;
   if (display) { display.style.fontSize='13px'; display.textContent='Erro — contacte o administrador'; }
 };
+// Fecha todos os modais — previne overlays presos
+function fecharTodosModais() {
+  ['modalAlertaMonitorOverlay','modalPerfilOverlay','modalAlocacaoOverlay','modalOverlay','modalAlertaGestorOverlay'].forEach(id=>{
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('aberto');
+  });
+}
+// ESC key also closes modals
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') fecharTodosModais(); });
+
 buildPin();
 </script>
 </body>
