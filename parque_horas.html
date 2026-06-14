@@ -770,9 +770,12 @@ function renderTotalFuncaoMonitor(regs) {
     minsPorFuncao[f] = (minsPorFuncao[f]||0) + Math.max(bruto-pausa,0);
   });
   if (!Object.keys(minsPorFuncao).length) { el.style.display='none'; return; }
+  const agora = new Date();
+  const nomeMesAtual = agora.toLocaleDateString('pt-PT', {month:'long', year:'numeric'});
   el.style.display='block';
   el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem;">
-    <p style="font-size:13px;font-weight:600;margin:0 0 10px;">Total de horas aprovadas</p>
+    <p style="font-size:13px;font-weight:600;margin:0 0 2px;">Total de horas aprovadas</p>
+    <p style="font-size:11px;color:var(--muted);margin:0 0 10px;text-transform:capitalize;">${nomeMesAtual}</p>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
       ${Object.entries(minsPorFuncao).map(([f,m])=>`
         <div style="background:var(--bg);border-radius:var(--radius-sm);padding:8px 16px;text-align:center;">
@@ -811,9 +814,27 @@ async function dispensarNotificacao(id) {
 
 async function carregarMonitor() {
   try {
-    const regs = await db(`registos?monitor_id=eq.${monitorAtual.id}&order=data.desc,criado_em.desc&limit=30`) || [];
+    const hoje = new Date();
+    const diaHoje = hoje.getDate();
+    const anoAtual = hoje.getFullYear();
+    const mesAtual = hoje.getMonth() + 1;
+    const mesAtualStr = String(mesAtual).padStart(2,'0');
+    const inicioMesAtual = `${anoAtual}-${mesAtualStr}-01`;
+    const ultimoDia = new Date(anoAtual, mesAtual, 0).getDate();
+    const fimMesAtual = `${anoAtual}-${mesAtualStr}-${String(ultimoDia).padStart(2,'0')}`;
+    // Se já passou o dia 10, o monitor só vê registos do mês atual em diante
+    let dataMinima;
+    if (diaHoje >= 10) {
+      dataMinima = inicioMesAtual;
+    } else {
+      const mesAnt = mesAtual === 1 ? 12 : mesAtual - 1;
+      const anoAnt = mesAtual === 1 ? anoAtual - 1 : anoAtual;
+      dataMinima = `${anoAnt}-${String(mesAnt).padStart(2,'0')}-01`;
+    }
+    const regs = await db(`registos?monitor_id=eq.${monitorAtual.id}&data=gte.${dataMinima}&order=data.desc,criado_em.desc&limit=50`) || [];
+    const regsMesAtual = regs.filter(r => r.data >= inicioMesAtual && r.data <= fimMesAtual);
     renderListaMonitor(regs);
-    renderTotalFuncaoMonitor(regs);
+    renderTotalFuncaoMonitor(regsMesAtual);
     renderNotificacoes(regs);
     verificarAlertasMonitor(regs);
 
@@ -1684,7 +1705,12 @@ async function carregarHistoricoDisp() {
     const porSemana = {};
     regs.forEach(r => { if(!porSemana[r.semana_inicio]) porSemana[r.semana_inicio]=[]; porSemana[r.semana_inicio].push(r); });
     el.innerHTML = Object.entries(porSemana).sort((a,b)=>b[0].localeCompare(a[0])).map(([sem, dias])=>{
-      const semFmt = new Date(sem+'T12:00:00').toLocaleDateString('pt-PT',{day:'numeric',month:'long'});
+      const dataInicio = new Date(sem+'T12:00:00');
+      const dataFim = new Date(dataInicio); dataFim.setDate(dataFim.getDate() + 6);
+      const fmtOpts = {day:'numeric',month:'long'};
+      const semInicio = dataInicio.toLocaleDateString('pt-PT', fmtOpts);
+      const semFim = dataFim.toLocaleDateString('pt-PT', fmtOpts);
+      const semFmt = `${semInicio} a ${semFim}`;
       const linhas = dias.sort((a,b)=>a.dia.localeCompare(b.dia)).map(d=>{
         const per = d.periodo==='manha'?'Manhã':d.periodo==='tarde'?'Tarde':d.periodo==='dia_inteiro'?'Dia inteiro':'Sem disponibilidade';
         const parq = d.parque ? ` · ${d.parque}` : '';
