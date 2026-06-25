@@ -2525,8 +2525,17 @@ async function adicionarMonitor() {
   catch(e){err.textContent='Erro ao adicionar. O PIN pode já estar em uso.';}
 }
 async function removerMonitor(id) {
-  if(!confirm('Tem a certeza que quer remover este monitor?')) return;
-  try { await db(`monitores?id=eq.${id}`,{method:'DELETE',prefer:'return=minimal',headers:{}}); await carregarGestor(); } catch(e){}
+  const monitor = monitoresCache.find(m => m.id === id);
+  const nome = monitor ? monitor.nome : 'este monitor';
+  if (!confirm(`Tem a certeza que quer remover "${nome}"?\n\nTodos os registos e disponibilidades associados serão eliminados permanentemente.`)) return;
+  try {
+    await db(`disponibilidades?monitor_id=eq.${id}`, {method:'DELETE', prefer:'return=minimal', headers:{}});
+    await db(`registos?monitor_id=eq.${id}`, {method:'DELETE', prefer:'return=minimal', headers:{}});
+    await db(`monitores?id=eq.${id}`, {method:'DELETE', prefer:'return=minimal', headers:{}});
+    await carregarGestor();
+  } catch(e) {
+    alert('Erro ao remover monitor: ' + e.message);
+  }
 }
 
 // MODAL
