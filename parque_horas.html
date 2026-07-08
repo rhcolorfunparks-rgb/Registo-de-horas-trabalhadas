@@ -1107,7 +1107,7 @@ async function renderTab() {
       const dow = d.getDay() === 0 ? 6 : d.getDay() - 1;
       const startOfWeek = new Date(d);
       startOfWeek.setDate(d.getDate() - dow);
-      const weekKey = `${r.monitor_nome}_${startOfWeek.toISOString().split('T')[0]}`;
+      const weekKey = `${r.monitor_nome}_${dateToISO(startOfWeek)}`;
       const bruto = calcMin(r.entrada, r.saida);
       const pausa = r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio, r.pausa_fim) : 0;
       const liq = Math.max(bruto - pausa, 0);
@@ -1518,7 +1518,16 @@ function getSemanaAnterior() {
   seg.setDate(ter.getDate() + 6);
   return {inicio: ter, fim: seg};
 }
-function dateToISO(d) { return d.toISOString().split('T')[0]; }
+function dateToISO(d) {
+  // Use local date components instead of toISOString() (which converts to UTC
+  // and can shift the date backward by one day for submissions made between
+  // 00:00-01:00 local time in UTC+1). This keeps the date exactly as the
+  // user's device displays it, regardless of timezone or browser.
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dia}`;
+}
 function fmtDataSimples(d) { return d.toLocaleDateString('pt-PT', {day:'numeric', month:'long'}); }
 
 // Reopen overrides - gestor can reopen form for specific monitors
@@ -2080,7 +2089,7 @@ async function enviarHorarios(nomes) {
         await db(`registos?id=eq.${regs[0].id}`, {method:'PATCH', body:{alerta_gestor:`📅 Horário semana ${new Date().toLocaleDateString('pt-PT')}: ${horario}`, visto_monitor:false, alerta_data_envio:new Date().toISOString(), alerta_data_confirmacao:null}, prefer:'return=minimal', headers:{}});
       } else {
         // Create a placeholder registo to carry the notification
-        const hoje = new Date().toISOString().split('T')[0];
+        const hoje = dateToISO(new Date());
         await db('registos', {method:'POST', body:{monitor_id:monitor.id, monitor_nome:monitor.nome, data:hoje, entrada:'00:00', saida:'00:01', equipa:'monitores', estado:'aprovado', alerta_gestor:`📅 Horário semana ${new Date().toLocaleDateString('pt-PT')}: ${horario}`, visto_monitor:false, alerta_data_envio:new Date().toISOString()}});
       }
       enviados++;
@@ -2765,7 +2774,7 @@ function gerarFolhasPontoPDF() {
 }
 
 // UTILS
-function hojeISO(){return new Date().toISOString().split('T')[0];}
+function hojeISO(){return dateToISO(new Date());}
 function horaAtual(){return new Date().toTimeString().slice(0,5);}
 function calcMin(e,s){const[eh,em]=e.split(':').map(Number),[sh,sm]=s.split(':').map(Number);let d=(sh*60+sm)-(eh*60+em);if(d<0)d+=1440;return d;}
 function minStr(m){return `${Math.floor(m/60)}h ${m%60}min`;}
