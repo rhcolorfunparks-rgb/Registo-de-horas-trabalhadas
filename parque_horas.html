@@ -2415,7 +2415,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       });
     }
 
-    // Previous months summary
+    // Previous months — expandable weekly breakdown
     meses.slice(1).forEach(m => {
       const regsM2 = regs.filter(r=>r.data>=m.inicio&&r.data<=m.fim);
       const totalMins = regsM2.reduce((acc,r)=>{
@@ -2424,10 +2424,56 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
         return acc+Math.max(bruto-pausa,0);
       },0);
       if (!totalMins) return;
-      html += `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:8px;">
-        <div style="display:flex;justify-content:space-between;">
+
+      // Group by week (segunda → domingo)
+      const semanasM = {};
+      regsM2.forEach(r => {
+        const d = new Date(r.data+'T12:00:00');
+        const dow = d.getDay()===0?6:d.getDay()-1;
+        const seg = new Date(d); seg.setDate(d.getDate()-dow);
+        const semKey = dateToISO(seg);
+        if (!semanasM[semKey]) semanasM[semKey] = {regs:[], mins:0};
+        const bruto = r.entrada&&r.saida?calcMin(r.entrada,r.saida):0;
+        const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+        semanasM[semKey].regs.push(r);
+        semanasM[semKey].mins += Math.max(bruto-pausa,0);
+      });
+
+      const mesId = `mes_${m.nome}_${m.ano}`.replace(/\s/g,'_');
+      const semanasHtml = Object.entries(semanasM).sort((a,b)=>b[0].localeCompare(a[0])).map(([seg, s]) => {
+        const segDate = new Date(seg+'T12:00:00');
+        const domDate = new Date(segDate); domDate.setDate(segDate.getDate()+6);
+        const over40 = s.mins > 40*60;
+        const regsHtml = s.regs.map(r => {
+          const bruto=r.entrada&&r.saida?calcMin(r.entrada,r.saida):0;
+          const pausa=r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+          const liq=Math.max(bruto-pausa,0);
+          const horasStr = r.entrada&&r.saida
+            ? `${r.entrada}–${r.saida}${r.pausa_inicio?` · Pausa: ${r.pausa_inicio}-${r.pausa_fim}`:''}`
+            : '—';
+          return `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:2px 0;border-top:0.5px solid var(--border);">
+            <span>${fmtData(r.data)}</span>
+            <span>${horasStr}</span>
+            <span style="font-weight:500;">${liq>0?Math.floor(liq/60)+'h '+liq%60+'min':'—'}</span>
+          </div>`;
+        }).join('');
+        return `<div style="border:1px solid ${over40?'#A32D2D':'var(--border)'};border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:6px;${over40?'background:#fff5f5':''}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+            <span style="font-weight:600;font-size:13px;">Semana ${segDate.toLocaleDateString('pt-PT',{day:'numeric',month:'short'})} – ${domDate.toLocaleDateString('pt-PT',{day:'numeric',month:'short'})}</span>
+            <span style="font-size:13px;font-weight:600;color:${over40?'#A32D2D':'var(--text)'};">${Math.floor(s.mins/60)}h ${s.mins%60}min${over40?' ⚠️':''}</span>
+          </div>
+          ${regsHtml}
+        </div>`;
+      }).join('');
+
+      html += `<div style="border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:8px;overflow:hidden;">
+        <div onclick="document.getElementById('${mesId}').style.display=document.getElementById('${mesId}').style.display==='none'?'block':'none'"
+          style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;cursor:pointer;background:var(--surface);">
           <span style="font-weight:600;font-size:13px;">${m.nome} ${m.ano}</span>
-          <span style="font-size:13px;font-weight:600;">${Math.floor(totalMins/60)}h ${totalMins%60}min</span>
+          <span style="font-size:13px;font-weight:600;">${Math.floor(totalMins/60)}h ${totalMins%60}min ▾</span>
+        </div>
+        <div id="${mesId}" style="display:none;padding:10px 12px;background:var(--bg);">
+          ${semanasHtml}
         </div>
       </div>`;
     });
