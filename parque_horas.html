@@ -1667,7 +1667,8 @@ function toggleDia(dataISO) {
 
 async function submeterDisponibilidade(modo) {
   const isReaberta = modo === 'reaberta';
-  const {inicio} = isReaberta ? getSemanaAnterior() : getProximaSemana();
+  // Quando bloqueado (segunda), reaberta aponta para semana SEGUINTE; caso contrário para anterior
+  const {inicio} = isReaberta ? (formularioBloqueado() ? getProximaSemana() : getSemanaAnterior()) : getProximaSemana();
   // Normalize to Tuesday to prevent off-by-one errors
   const inicioNorm = new Date(inicio);
   // Ensure it's a Tuesday (day 2)
