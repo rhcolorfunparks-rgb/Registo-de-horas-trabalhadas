@@ -1576,11 +1576,12 @@ async function iniciarDisponibilidade() {
 
   if (semanaReaberta) {
     cardReaberta.style.display = 'block';
-    const {inicio: inicioAnt, fim: fimAnt} = getSemanaAnterior();
-    const semanaStrAnt = `${fmtDataSimples(inicioAnt)} a ${fmtDataSimples(fimAnt)}`;
-    document.getElementById('dispSemanaInfoReaberta').textContent = `Semana de ${semanaStrAnt}`;
-    const existentesAnt = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicioAnt)}&order=dia.asc`) || [];
-    renderDiasDisp(inicioAnt, existentesAnt, existentesAnt.length > 0, 'reaberta');
+    // Se está bloqueado (segunda), reabrir mostra a semana SEGUINTE; caso contrário a anterior
+    const {inicio: inicioReab, fim: fimReab} = formularioBloqueado() ? getProximaSemana() : getSemanaAnterior();
+    const semanaStrReab = `${fmtDataSimples(inicioReab)} a ${fmtDataSimples(fimReab)}`;
+    document.getElementById('dispSemanaInfoReaberta').textContent = `Semana de ${semanaStrReab}`;
+    const existentesReab = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicioReab)}&order=dia.asc`) || [];
+    renderDiasDisp(inicioReab, existentesReab, existentesReab.length > 0, 'reaberta');
   } else {
     cardReaberta.style.display = 'none';
   }
