@@ -1772,10 +1772,10 @@ function renderDispView(el, inicio, fim) {
   // Bloqueado se: o domingo ANTERIOR ao início da semana já passou
   // (prazo fecha no domingo antes da terça de início)
   const agora = new Date();
-  const segundaAnterior = new Date(inicio);
-  segundaAnterior.setDate(inicio.getDate() - 1); // dia antes da terça = segunda
-  segundaAnterior.setHours(23, 59, 59, 0);
-  const bloqueadoGestor = agora > segundaAnterior || formularioBloqueado();
+  const domingoAnterior = new Date(inicio);
+  domingoAnterior.setDate(inicio.getDate() - 2); // 2 dias antes da terça = domingo
+  domingoAnterior.setHours(23, 59, 59, 0);
+  const bloqueadoGestor = agora > domingoAnterior || formularioBloqueado();
   const hdr = document.createElement('div');
   hdr.style.cssText = 'margin-bottom:12px;';
   hdr.innerHTML = `
@@ -1830,8 +1830,8 @@ function renderDispView(el, inicio, fim) {
     <span><span style="background:#f5f5f5;padding:2px 8px;border-radius:4px;color:#ccc;">—</span> Indisponível</span>`;
   el.appendChild(leg);
 
-  // Reabrir formulário para monitor específico (só visível quando bloqueado)
-  if (bloqueadoGestor) {
+  // Reabrir formulário para monitor específico (sempre visível para o gestor)
+  if (true) {
     const reabrirDiv = document.createElement('div');
     reabrirDiv.style.cssText = 'margin-top:1rem;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);';
     reabrirDiv.innerHTML = `
