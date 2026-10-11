@@ -239,7 +239,7 @@
         </div>
         <!-- Pausa (só equipa interna) -->
         <div id="pausaSection" style="display:none;margin-bottom:10px;">
-          <label style="display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:4px;">Pausa</label>
+          <label style="display:block;font-size:12px;color:var(--muted);font-weight:500;margin-bottom:4px;">Pausa de Almoço</label>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div>
               <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:3px;">Início da pausa</label>
@@ -248,6 +248,17 @@
             <div>
               <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:3px;">Fim da pausa</label>
               <input type="time" id="mPausaFim" style="width:100%;font-size:14px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
+            </div>
+          </div>
+          <label style="display:block;font-size:12px;color:var(--muted);font-weight:500;margin-top:8px;margin-bottom:4px;">Pausa de Lanche</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div>
+              <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:3px;">Início da pausa</label>
+              <input type="time" id="mPausa2Inicio" style="width:100%;font-size:14px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="display:block;font-size:11px;color:var(--muted);margin-bottom:3px;">Fim da pausa</label>
+              <input type="time" id="mPausa2Fim" style="width:100%;font-size:14px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);font-family:'DM Sans',sans-serif;background:var(--surface);color:var(--text);box-sizing:border-box;">
             </div>
           </div>
         </div>
@@ -550,8 +561,12 @@
     </div>
     <div id="modalPausaRow" style="display:none;">
       <div class="field-row">
-        <div class="field"><label>Início pausa</label><input type="time" id="modalPausaInicio"></div>
-        <div class="field"><label>Fim pausa</label><input type="time" id="modalPausaFim"></div>
+        <div class="field"><label>Início pausa almoço</label><input type="time" id="modalPausaInicio"></div>
+        <div class="field"><label>Fim pausa almoço</label><input type="time" id="modalPausaFim"></div>
+      </div>
+      <div class="field-row" style="margin-top:6px;">
+        <div class="field"><label>Início pausa lanche</label><input type="time" id="modalPausa2Inicio"></div>
+        <div class="field"><label>Fim pausa lanche</label><input type="time" id="modalPausa2Fim"></div>
       </div>
       <div class="field"><label>Observações</label><input type="text" id="modalObs" placeholder="Ex: Feriado trabalhado, Formação, Atraso..."></div>
     </div>
@@ -712,18 +727,23 @@ async function iniciarMonitor() {
     const sai = document.getElementById('mSaida').value;
     const pi = isInterno ? (document.getElementById('mPausaInicio') ? document.getElementById('mPausaInicio').value : '') : (document.getElementById('mPausaInicioMonitor') ? document.getElementById('mPausaInicioMonitor').value : '');
     const pf = isInterno ? (document.getElementById('mPausaFim') ? document.getElementById('mPausaFim').value : '') : (document.getElementById('mPausaFimMonitor') ? document.getElementById('mPausaFimMonitor').value : '');
+    const pi2 = isInterno && document.getElementById('mPausa2Inicio') ? document.getElementById('mPausa2Inicio').value : '';
+    const pf2 = isInterno && document.getElementById('mPausa2Fim') ? document.getElementById('mPausa2Fim').value : '';
     if (ent && sai) {
       let total = calcMin(ent, sai);
-      let pausaMin = pi && pf ? calcMin(pi, pf) : 0;
+      let pausaMin = (pi && pf ? calcMin(pi, pf) : 0) + (pi2 && pf2 ? calcMin(pi2, pf2) : 0);
       const liquido = Math.max(total - pausaMin, 0);
       if (total > 0) {
-        document.getElementById('mPreview').textContent = pi && pf
-          ? `Total: ${minStr(total)} − Pausa: ${minStr(pausaMin)} = ${minStr(liquido)} efetivas`
+        let pausaDesc = '';
+        if (pi && pf && pi2 && pf2) pausaDesc = `Almoço: ${minStr(pi&&pf?calcMin(pi,pf):0)} + Lanche: ${minStr(pi2&&pf2?calcMin(pi2,pf2):0)}`;
+        else if (pi && pf) pausaDesc = `Pausa: ${minStr(calcMin(pi,pf))}`;
+        document.getElementById('mPreview').textContent = pausaDesc
+          ? `Total: ${minStr(total)} − ${pausaDesc} = ${minStr(liquido)} efetivas`
           : `Total: ${minStr(total)}`;
       }
     }
   };
-  ['mEntrada','mSaida','mPausaInicio','mPausaFim','mPausaInicioMonitor','mPausaFimMonitor'].forEach(id => {
+  ['mEntrada','mSaida','mPausaInicio','mPausaFim','mPausaInicioMonitor','mPausaFimMonitor','mPausa2Inicio','mPausa2Fim'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.oninput = upd;
   });
@@ -766,7 +786,7 @@ function renderTotalFuncaoMonitor(regs) {
   regs.filter(r=>r.estado==='aprovado'&&r.saida&&r.entrada).forEach(r=>{
     const f = r.funcao||'—';
     const bruto = calcMin(r.entrada,r.saida);
-    const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+    const pausa = (r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
     minsPorFuncao[f] = (minsPorFuncao[f]||0) + Math.max(bruto-pausa,0);
   });
   if (!Object.keys(minsPorFuncao).length) { el.style.display='none'; return; }
@@ -859,13 +879,16 @@ function renderListaMonitor(regs) {
     const d = document.createElement('div'); d.className = 'reg-row';
     const est = r.estado||'pendente';
     const bruto = r.saida && r.entrada ? calcMin(r.entrada,r.saida) : 0;
-    const pausaMin = r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio,r.pausa_fim) : 0;
+    const pausaMin = (r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio,r.pausa_fim) : 0) + (r.pausa2_inicio && r.pausa2_fim ? calcMin(r.pausa2_inicio,r.pausa2_fim) : 0);
     const h = r.saida ? minStr(Math.max(bruto-pausaMin,0)) : 'em curso';
     const fc = r.funcao||'';
     const tipoDia = r.tipo_dia && r.tipo_dia !== 'normal' ? r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1) : '';
     const parqueTag = r.parque ? ` · <span style='font-size:11px;font-weight:600;color:#555;'>${r.parque}</span>` : '';
     const horasInfo = tipoDia ? `<strong>${tipoDia}</strong>` : `${r.entrada||'—'} → ${r.saida||'—'} · <strong>${h}</strong>${parqueTag}`;
-    const pausaInfo = r.pausa_inicio && r.pausa_fim ? ` · Pausa: ${r.pausa_inicio}–${r.pausa_fim}` : '';
+    let pausaInfo = '';
+    if (r.pausa_inicio && r.pausa_fim) pausaInfo += ` · Almoço: ${r.pausa_inicio}–${r.pausa_fim}`;
+    if (r.pausa2_inicio && r.pausa2_fim) pausaInfo += ` · Lanche: ${r.pausa2_inicio}–${r.pausa2_fim}`;
+    if (pausaInfo === '' && r.pausa_inicio && r.pausa_fim) pausaInfo = ` · Pausa: ${r.pausa_inicio}–${r.pausa_fim}`;
     const obsInfo = r.observacoes ? `<span style="font-size:11px;color:var(--muted);display:block;margin-top:2px;">📝 ${r.observacoes}</span>` : '';
     const alertaInfo = r.alerta ? `<span style="font-size:11px;color:#A32D2D;display:block;margin-top:2px;">⚠️ Erro reportado: ${r.alerta}</span>` : '';
     const btnReportar = !r.alerta && est !== 'rejeitado' ? `<button onclick="abrirReportarErro('${r.id}')" style="font-size:11px;padding:2px 8px;cursor:pointer;border-radius:8px;color:#888;border:0.5px solid #ccc;background:transparent;margin-top:6px;">⚠️ Reportar erro</button>` : '';
@@ -904,6 +927,8 @@ async function submeterRegisto() {
     const pausaFim = isInterno
       ? (document.getElementById('mPausaFim') ? document.getElementById('mPausaFim').value || null : null)
       : (document.getElementById('mPausaFimMonitor') ? document.getElementById('mPausaFimMonitor').value || null : null);
+    const pausa2Inicio = isInterno ? (document.getElementById('mPausa2Inicio') ? document.getElementById('mPausa2Inicio').value || null : null) : null;
+    const pausa2Fim = isInterno ? (document.getElementById('mPausa2Fim') ? document.getElementById('mPausa2Fim').value || null : null) : null;
     const obs = isInterno
       ? (document.getElementById('mObs') ? document.getElementById('mObs').value.trim() || null : null)
       : (document.getElementById('mObsMonitor') ? document.getElementById('mObsMonitor').value.trim() || null : null);
@@ -914,12 +939,14 @@ async function submeterRegisto() {
         err.style.color = 'var(--red)';
         return err.textContent = 'Já existe um registo com este horário para esta data. Verifique os seus registos recentes.';
       }
-      await db('registos', {method:'POST', body:{monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, data, entrada:ent, saida:sai, pausa_inicio:pausaInicio, pausa_fim:pausaFim, observacoes:obs, funcao, parque, equipa, tipo_dia:'normal', estado:'pendente'}});
+      await db('registos', {method:'POST', body:{monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, data, entrada:ent, saida:sai, pausa_inicio:pausaInicio, pausa_fim:pausaFim, pausa2_inicio:pausa2Inicio, pausa2_fim:pausa2Fim, observacoes:obs, funcao, parque, equipa, tipo_dia:'normal', estado:'pendente'}});
       err.style.color = 'var(--green)'; err.textContent = 'Registo submetido com sucesso!';
       document.getElementById('mEntrada').value = '';
       document.getElementById('mSaida').value = '';
       if (document.getElementById('mPausaInicio')) document.getElementById('mPausaInicio').value = '';
       if (document.getElementById('mPausaFim')) document.getElementById('mPausaFim').value = '';
+      if (document.getElementById('mPausa2Inicio')) document.getElementById('mPausa2Inicio').value = '';
+      if (document.getElementById('mPausa2Fim')) document.getElementById('mPausa2Fim').value = '';
       if (document.getElementById('mPausaInicioMonitor')) document.getElementById('mPausaInicioMonitor').value = '';
       if (document.getElementById('mPausaFimMonitor')) document.getElementById('mPausaFimMonitor').value = '';
       if (document.getElementById('mObs')) document.getElementById('mObs').value = '';
@@ -1109,7 +1136,7 @@ async function renderTab() {
       startOfWeek.setDate(d.getDate() - dow);
       const weekKey = `${r.monitor_nome}_${dateToISO(startOfWeek)}`;
       const bruto = calcMin(r.entrada, r.saida);
-      const pausa = r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio, r.pausa_fim) : 0;
+      const pausa = (r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio, r.pausa_fim) : 0) + (r.pausa2_inicio && r.pausa2_fim ? calcMin(r.pausa2_inicio, r.pausa2_fim) : 0);
       const liq = Math.max(bruto - pausa, 0);
       if (!horasSemanais[r.monitor_nome]) horasSemanais[r.monitor_nome] = {};
       horasSemanais[r.monitor_nome][weekKey] = (horasSemanais[r.monitor_nome][weekKey] || 0) + liq;
@@ -1126,7 +1153,7 @@ async function renderTab() {
   regs.forEach(r => {
     const tr = document.createElement('tr');
     const brutoMin = r.saida && r.entrada ? calcMin(r.entrada,r.saida) : 0;
-    const pMin = r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio,r.pausa_fim) : 0;
+    const pMin = (r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio,r.pausa_fim) : 0) + (r.pausa2_inicio && r.pausa2_fim ? calcMin(r.pausa2_inicio,r.pausa2_fim) : 0);
     const h = r.saida ? minStr(Math.max(brutoMin-pMin,0)) : '—';
     let ac='';
     if (tabAtiva==='pendente') ac=`<button class="btn-act edit" onclick="abrirModal('${r.id}')">Editar</button><button class="btn-act apr" onclick="mudarEstado('${r.id}','aprovado')">Aprovar</button><button class="btn-act rej" onclick="alertarMonitorRegisto('${r.id}','${r.monitor_nome}')">⚠️ Alertar</button><button class="btn-act" onclick="eliminarRegisto('${r.id}')" style="color:var(--muted);border-color:var(--border);">Eliminar</button>`;
@@ -1134,7 +1161,9 @@ async function renderTab() {
     else ac=`<button class="btn-act apr" onclick="mudarEstado('${r.id}','aprovado')">Aprovar</button><button class="btn-act rej" onclick="apagarRegisto('${r.id}')">Apagar</button>`;
     const parqueLabel = r.parque ? ` <span style='font-size:11px;font-weight:600;background:#f0f0f0;padding:1px 6px;border-radius:10px;'>${r.parque}</span>` : '';
     const tipoDiaLabel = r.tipo_dia && r.tipo_dia !== 'normal' ? ` <span class="badge badge-pend">${r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1)}</span>` : '';
-    const pausaLabel = r.pausa_inicio && r.pausa_fim ? `<br><span style="font-size:11px;color:var(--muted);">Pausa: ${r.pausa_inicio}–${r.pausa_fim}</span>` : '';
+    let pausaLabel = '';
+    if (r.pausa_inicio && r.pausa_fim) pausaLabel += `<br><span style="font-size:11px;color:var(--muted);">Almoço: ${r.pausa_inicio}–${r.pausa_fim}</span>`;
+    if (r.pausa2_inicio && r.pausa2_fim) pausaLabel += `<br><span style="font-size:11px;color:var(--muted);">Lanche: ${r.pausa2_inicio}–${r.pausa2_fim}</span>`;
     const obsLabel = r.observacoes ? `<br><span style="font-size:11px;color:var(--muted);">📝 ${r.observacoes}</span>` : '';
     const aviso40h = gestorTipo==='interno' && temSemana40h(r.monitor_nome) ? ' <span title="Ultrapassa 40h semanais!" style="font-size:13px;">⚠️</span>' : '';
     tr.innerHTML=`<td>${fmtData(r.data)}${tipoDiaLabel}</td><td><strong>${r.monitor_nome}</strong>${aviso40h}</td><td><span style="font-size:12px;font-weight:600;background:var(--bg);padding:2px 8px;border-radius:20px;">${r.funcao||'—'}</span>${parqueLabel}</td><td>${r.entrada||'—'}${pausaLabel}</td><td>${r.saida||'—'}</td><td><strong>${h}</strong>${obsLabel}</td><td><div class="acoes">${ac}</div></td>`;
@@ -1576,12 +1605,11 @@ async function iniciarDisponibilidade() {
 
   if (semanaReaberta) {
     cardReaberta.style.display = 'block';
-    // Se está bloqueado (segunda), reabrir mostra a semana SEGUINTE; caso contrário a anterior
-    const {inicio: inicioReab, fim: fimReab} = formularioBloqueado() ? getProximaSemana() : getSemanaAnterior();
-    const semanaStrReab = `${fmtDataSimples(inicioReab)} a ${fmtDataSimples(fimReab)}`;
-    document.getElementById('dispSemanaInfoReaberta').textContent = `Semana de ${semanaStrReab}`;
-    const existentesReab = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicioReab)}&order=dia.asc`) || [];
-    renderDiasDisp(inicioReab, existentesReab, existentesReab.length > 0, 'reaberta');
+    const {inicio: inicioAnt, fim: fimAnt} = getSemanaAnterior();
+    const semanaStrAnt = `${fmtDataSimples(inicioAnt)} a ${fmtDataSimples(fimAnt)}`;
+    document.getElementById('dispSemanaInfoReaberta').textContent = `Semana de ${semanaStrAnt}`;
+    const existentesAnt = await db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&semana_inicio=eq.${dateToISO(inicioAnt)}&order=dia.asc`) || [];
+    renderDiasDisp(inicioAnt, existentesAnt, existentesAnt.length > 0, 'reaberta');
   } else {
     cardReaberta.style.display = 'none';
   }
@@ -1667,8 +1695,7 @@ function toggleDia(dataISO) {
 
 async function submeterDisponibilidade(modo) {
   const isReaberta = modo === 'reaberta';
-  // Quando bloqueado (segunda), reaberta aponta para semana SEGUINTE; caso contrário para anterior
-  const {inicio} = isReaberta ? (formularioBloqueado() ? getProximaSemana() : getSemanaAnterior()) : getProximaSemana();
+  const {inicio} = isReaberta ? getSemanaAnterior() : getProximaSemana();
   // Normalize to Tuesday to prevent off-by-one errors
   const inicioNorm = new Date(inicio);
   // Ensure it's a Tuesday (day 2)
@@ -1774,10 +1801,10 @@ function renderDispView(el, inicio, fim) {
   // Bloqueado se: o domingo ANTERIOR ao início da semana já passou
   // (prazo fecha no domingo antes da terça de início)
   const agora = new Date();
-  const domingoAnterior = new Date(inicio);
-  domingoAnterior.setDate(inicio.getDate() - 2); // 2 dias antes da terça = domingo
-  domingoAnterior.setHours(23, 59, 59, 0);
-  const bloqueadoGestor = agora > domingoAnterior || formularioBloqueado();
+  const segundaAnterior = new Date(inicio);
+  segundaAnterior.setDate(inicio.getDate() - 1); // dia antes da terça = segunda
+  segundaAnterior.setHours(23, 59, 59, 0);
+  const bloqueadoGestor = agora > segundaAnterior || formularioBloqueado();
   const hdr = document.createElement('div');
   hdr.style.cssText = 'margin-bottom:12px;';
   hdr.innerHTML = `
@@ -1832,8 +1859,8 @@ function renderDispView(el, inicio, fim) {
     <span><span style="background:#f5f5f5;padding:2px 8px;border-radius:4px;color:#ccc;">—</span> Indisponível</span>`;
   el.appendChild(leg);
 
-  // Reabrir formulário para monitor específico (sempre visível para o gestor)
-  if (true) {
+  // Reabrir formulário para monitor específico (só visível quando bloqueado)
+  if (bloqueadoGestor) {
     const reabrirDiv = document.createElement('div');
     reabrirDiv.style.cssText = 'margin-top:1rem;padding:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);';
     reabrirDiv.innerHTML = `
@@ -2295,7 +2322,7 @@ async function abrirPerfilMonitorExterno(monitorId, nomeMonitor) {
         if(!r.entrada||!r.saida) return;
         const f = r.funcao||'—';
         const bruto = calcMin(r.entrada,r.saida);
-        const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+        const pausa = (r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
         minsPorFuncao[f] = (minsPorFuncao[f]||0)+Math.max(bruto-pausa,0);
       });
       const totalMins = Object.values(minsPorFuncao).reduce((a,b)=>a+b,0);
@@ -2376,7 +2403,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       const semKey = dateToISO(seg);
       if (!semanas[semKey]) semanas[semKey] = {regs:[], mins:0};
       const bruto = r.entrada && r.saida ? calcMin(r.entrada,r.saida) : 0;
-      const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+      const pausa = (r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
       const liq = Math.max(bruto-pausa,0);
       semanas[semKey].regs.push(r);
       semanas[semKey].mins += liq;
@@ -2398,11 +2425,14 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
           </div>
           ${s.regs.map(r=>{
             const bruto=r.entrada&&r.saida?calcMin(r.entrada,r.saida):0;
-            const pausa=r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+            const pausa=(r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
             const liq=Math.max(bruto-pausa,0);
             const tipoDia = r.tipo_dia&&r.tipo_dia!=='normal'?` · ${r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1)}`:'';
+            let pausaStr='';
+            if(r.pausa_inicio&&r.pausa_fim) pausaStr+=` · Almoço: ${r.pausa_inicio}-${r.pausa_fim}`;
+            if(r.pausa2_inicio&&r.pausa2_fim) pausaStr+=` · Lanche: ${r.pausa2_inicio}-${r.pausa2_fim}`;
             const horasStr = r.entrada && r.saida
-              ? `${r.entrada}–${r.saida}${r.pausa_inicio?` · Pausa: ${r.pausa_inicio}-${r.pausa_fim}`:''}`
+              ? `${r.entrada}–${r.saida}${pausaStr}`
               : (r.tipo_dia && r.tipo_dia !== 'normal' ? r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1) : '—');
             const minsStr = liq > 0 ? `${Math.floor(liq/60)}h ${liq%60}min` : '—';
             return `<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:2px 0;border-top:0.5px solid var(--border);">
@@ -2420,7 +2450,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       const regsM2 = regs.filter(r=>r.data>=m.inicio&&r.data<=m.fim);
       const totalMins = regsM2.reduce((acc,r)=>{
         const bruto=r.entrada&&r.saida?calcMin(r.entrada,r.saida):0;
-        const pausa=r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+        const pausa=(r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
         return acc+Math.max(bruto-pausa,0);
       },0);
       if (!totalMins) return;
@@ -2562,6 +2592,8 @@ function abrirModal(id) {
     pausaRow.style.display = 'block';
     document.getElementById('modalPausaInicio').value = r.pausa_inicio||'';
     document.getElementById('modalPausaFim').value = r.pausa_fim||'';
+    document.getElementById('modalPausa2Inicio').value = r.pausa2_inicio||'';
+    document.getElementById('modalPausa2Fim').value = r.pausa2_fim||'';
     document.getElementById('modalObs').value = r.observacoes||'';
   }
   const funcaoRow = document.getElementById('modalFuncaoRow');
@@ -2576,13 +2608,19 @@ function abrirModal(id) {
     const e=document.getElementById('modalEntrada').value,s=document.getElementById('modalSaida').value;
     const pi=document.getElementById('modalPausaInicio')?document.getElementById('modalPausaInicio').value:'';
     const pf=document.getElementById('modalPausaFim')?document.getElementById('modalPausaFim').value:'';
+    const pi2=document.getElementById('modalPausa2Inicio')?document.getElementById('modalPausa2Inicio').value:'';
+    const pf2=document.getElementById('modalPausa2Fim')?document.getElementById('modalPausa2Fim').value:'';
     const bruto=e&&s&&calcMin(e,s)>0?calcMin(e,s):0;
-    const pausaMin=pi&&pf?calcMin(pi,pf):0;
+    const pausaMin=(pi&&pf?calcMin(pi,pf):0)+(pi2&&pf2?calcMin(pi2,pf2):0);
     const liq=Math.max(bruto-pausaMin,0);
-    document.getElementById('modalPreview').textContent=e&&s&&bruto>0?(pi&&pf?`Total: ${minStr(bruto)} − Pausa: ${minStr(pausaMin)} = ${minStr(liq)} efetivas`:`Total: ${minStr(bruto)}`):(e&&s?'Saída deve ser após entrada.':'');
+    let pausaDesc='';
+    if(pi&&pf&&pi2&&pf2) pausaDesc=`Almoço: ${minStr(pi&&pf?calcMin(pi,pf):0)} + Lanche: ${minStr(pi2&&pf2?calcMin(pi2,pf2):0)}`;
+    else if(pi&&pf) pausaDesc=`Pausa: ${minStr(calcMin(pi,pf))}`;
+    document.getElementById('modalPreview').textContent=e&&s&&bruto>0?(pausaDesc?`Total: ${minStr(bruto)} − ${pausaDesc} = ${minStr(liq)} efetivas`:`Total: ${minStr(bruto)}`):(e&&s?'Saída deve ser após entrada.':'');
   };
   document.getElementById('modalEntrada').oninput=upd; document.getElementById('modalSaida').oninput=upd;
   if(document.getElementById('modalPausaInicio')) { document.getElementById('modalPausaInicio').oninput=upd; document.getElementById('modalPausaFim').oninput=upd; }
+  if(document.getElementById('modalPausa2Inicio')) { document.getElementById('modalPausa2Inicio').oninput=upd; document.getElementById('modalPausa2Fim').oninput=upd; }
   upd();
   document.getElementById('modalOverlay').classList.add('aberto');
 }
@@ -2595,6 +2633,8 @@ async function confirmarEdicao() {
   const body = {data,entrada:ent,saida:sai,estado:'aprovado'};
   body.pausa_inicio = document.getElementById('modalPausaInicio').value||null;
   body.pausa_fim = document.getElementById('modalPausaFim').value||null;
+  body.pausa2_inicio = document.getElementById('modalPausa2Inicio') ? document.getElementById('modalPausa2Inicio').value||null : null;
+  body.pausa2_fim = document.getElementById('modalPausa2Fim') ? document.getElementById('modalPausa2Fim').value||null : null;
   body.observacoes = document.getElementById('modalObs').value.trim()||null;
   if(gestorTipo==='monitores') {
     body.funcao = document.getElementById('modalFuncao').value||null;
@@ -2609,8 +2649,13 @@ function exportarCSV() {
   const mes=document.getElementById('gMes').value,ano=document.getElementById('gAno').value;
   const regs=registosCache.filter(r=>r.estado==='aprovado'&&r.saida);
   if(!regs.length){alert('Sem registos aprovados para exportar.');return;}
-  let csv='Monitor,Data,Tipo,Função,Parque,Entrada,Início Pausa,Fim Pausa,Saída,Horas,Observações\n';
-  regs.forEach(r=>csv+=`"${r.monitor_nome}",${fmtData(r.data)},${r.tipo_dia||'normal'},"${r.funcao||'—'}","${r.parque||'—'}",${r.entrada||''},${r.pausa_inicio||''},${r.pausa_fim||''},${r.saida||''},${r.entrada&&r.saida?(calcMin(r.entrada,r.saida)/60).toFixed(2):'0'},"${r.observacoes||''}"\n`);
+  let csv='Monitor,Data,Tipo,Função,Parque,Entrada,Início Pausa Almoço,Fim Pausa Almoço,Início Pausa Lanche,Fim Pausa Lanche,Saída,Horas,Observações\n';
+  regs.forEach(r=>{
+    const bruto=r.entrada&&r.saida?calcMin(r.entrada,r.saida):0;
+    const pausa=(r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
+    const liq=Math.max(bruto-pausa,0);
+    csv+=`"${r.monitor_nome}",${fmtData(r.data)},${r.tipo_dia||'normal'},"${r.funcao||'—'}","${r.parque||'—'}",${r.entrada||''},${r.pausa_inicio||''},${r.pausa_fim||''},${r.pausa2_inicio||''},${r.pausa2_fim||''},${r.saida||''},${(liq/60).toFixed(2)},"${r.observacoes||''}"\n`;
+  });
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
   a.download=`horas_${MESES[parseInt(mes)-1]}_${ano}.csv`;a.click();
 }
@@ -2717,12 +2762,14 @@ function gerarFolhasPontoPDF() {
           let firstRow = true;
           diaDados.forEach(reg => {
             const min = reg.entrada&&reg.saida?calcMin(reg.entrada,reg.saida):0;
-            const pausaMin = reg.pausa_inicio&&reg.pausa_fim?calcMin(reg.pausa_inicio,reg.pausa_fim):0;
+            const pausaMin = (reg.pausa_inicio&&reg.pausa_fim?calcMin(reg.pausa_inicio,reg.pausa_fim):0) + (reg.pausa2_inicio&&reg.pausa2_fim?calcMin(reg.pausa2_inicio,reg.pausa2_fim):0);
             const liq = Math.max(min-pausaMin, 0);
             totalMin += liq;
             if (firstRow) { diasTrab++; firstRow = false; }
             if (isInterno) {
-              rows.push(`<tr><td>${dataFmt}</td><td>${reg.entrada||''}</td><td>${reg.pausa_inicio||''}</td><td>${reg.pausa_fim||''}</td><td>${reg.saida||''}</td><td>${Math.floor(liq/60)}:${String(liq%60).padStart(2,'0')}</td><td class="obs-cell">${reg.observacoes||''}</td></tr>`);
+              const p1 = reg.pausa_inicio&&reg.pausa_fim ? `${reg.pausa_inicio}–${reg.pausa_fim}` : '';
+              const p2 = reg.pausa2_inicio&&reg.pausa2_fim ? `${reg.pausa2_inicio}–${reg.pausa2_fim}` : '';
+              rows.push(`<tr><td>${dataFmt}</td><td>${reg.entrada||''}</td><td>${p1}</td><td>${p2}</td><td>${reg.saida||''}</td><td>${Math.floor(liq/60)}:${String(liq%60).padStart(2,'0')}</td><td class="obs-cell">${reg.observacoes||''}</td></tr>`);
             } else {
               const pausaStr = reg.pausa_inicio&&reg.pausa_fim ? `${reg.pausa_inicio}–${reg.pausa_fim}` : '';
               rows.push(`<tr><td>${dataFmt}</td><td>${reg.funcao||'—'}</td><td>${reg.parque||'—'}</td><td>${reg.entrada||''}</td><td>${reg.saida||''}</td><td>${pausaStr}</td><td>${Math.floor(liq/60)}:${String(liq%60).padStart(2,'0')}</td><td class="obs-cell">${reg.observacoes||''}</td></tr>`);
@@ -2731,7 +2778,7 @@ function gerarFolhasPontoPDF() {
         }
       } else {
         if (isInterno) {
-          rows.push(`<tr><td>${dataFmt}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`);
+          rows.push(`<tr><td>${dataFmt}</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`);
         } else {
           rows.push(`<tr><td>${dataFmt}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`);
         }
@@ -2745,7 +2792,7 @@ function gerarFolhasPontoPDF() {
       regs.filter(r=>r.saida&&r.entrada&&r.tipo_dia!=='ferias').forEach(r=>{
         const f = r.funcao||'—';
         const bruto = calcMin(r.entrada,r.saida);
-        const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
+        const pausa = (r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
         minsPorFuncao[f] = (minsPorFuncao[f]||0) + Math.max(bruto-pausa,0);
       });
       const funcaoRows = Object.entries(minsPorFuncao).map(([f,m])=>`<tr><td style="text-align:left;padding:4px 6px;">${f}</td><td style="padding:4px 6px;">${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}</td></tr>`).join('');
@@ -2760,7 +2807,7 @@ function gerarFolhasPontoPDF() {
 
         <div class="info-row"><span class="info-label">Dias trabalhados:</span><span>${diasTrab}</span></div>
       </div>
-      <table><thead><tr>${isInterno ? '<th>Data</th><th>Entrada</th><th>Início Pausa</th><th>Fim Pausa</th><th>Saída</th><th>Total Horas</th><th>Observações</th>' : '<th>Data</th><th>Função</th><th>Parque</th><th>Entrada</th><th>Saída</th><th>Pausa</th><th>Total Horas</th><th>Observações</th>'}</tr></thead>
+      <table><thead><tr>${isInterno ? '<th>Data</th><th>Entrada</th><th>Pausa Almoço</th><th>Pausa Lanche</th><th>Saída</th><th>Total Horas</th><th>Observações</th>' : '<th>Data</th><th>Função</th><th>Parque</th><th>Entrada</th><th>Saída</th><th>Pausa</th><th>Total Horas</th><th>Observações</th>'}</tr></thead>
       <tbody>${rows.join('')}<tr class="total-row"><td colspan="${isInterno?5:6}">TOTAL TRABALHADAS (MÊS)</td><td>${tH}:${String(tM).padStart(2,'0')}</td><td></td></tr></tbody></table>
       ${funcaoResumo}
       <div class="assinaturas"><div class="ass-box">Assinatura do Colaborador</div><div class="ass-box">Assinatura do Gestor</div><div class="ass-box">Data</div></div>
