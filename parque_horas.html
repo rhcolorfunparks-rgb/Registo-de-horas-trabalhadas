@@ -748,6 +748,7 @@ async function iniciarMonitor() {
     if (el) el.oninput = upd;
   });
   await carregarMonitor();
+  if (!isInterno) carregarMeuHorario();
 }
 let alertasQueue = [];
 let alertaAtualIdx = 0;
