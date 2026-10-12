@@ -1411,10 +1411,10 @@ async function renderMonitores(el) {
           }
         });
         const cellStyle = (n) => {
-          const bg = n===0?'background:#FFCDD2;':n===1?'background:#FFF9C4;':'background:#C8E6C9;';
+          const bg = n<=1?'background:#FFCDD2;':n<=3?'background:#FFF9C4;':'background:#C8E6C9;';
           return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:600;${bg}`;
         };
-        let tbl = `<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">🔴 = 0 · 🟡 = 1 · 🟢 = 2+&nbsp;&nbsp;(nº de semanas com disponibilidade, máx 4)</p>
+        let tbl = `<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">🔴 = 0–1 semanas · 🟡 = 2–3 semanas · 🟢 = 4 semanas (máx. 4 possíveis)</p>
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <thead><tr>
             <th style="padding:6px 8px;border:1px solid var(--border);text-align:left;background:var(--surface);">Monitor</th>
@@ -2358,25 +2358,20 @@ async function abrirPerfilMonitorExterno(monitorId, nomeMonitor) {
     // Fetch all approved registos for this monitor
     const regs = await db(`registos?monitor_id=eq.${monitorId}&estado=eq.aprovado&order=data.desc`) || [];
 
-    // Semaforo - last 4 weeks
+    // Semaforo - based on disponibilidades given (last 4 weeks)
     const dataFimSem = dateToISO(agora);
-    const dataInicioSem = new Date(agora); dataInicioSem.setDate(agora.getDate()-28);
-    const dataInicioSemStr = dateToISO(dataInicioSem);
-    let periodosFdS = 0;
-    const jaContadosSem = new Set();
-    regs.filter(r=>r.data>=dataInicioSemStr&&r.data<=dataFimSem).forEach(r=>{
-      const dow = new Date(r.data+'T12:00:00').getDay();
-      if ((dow===0||dow===6) && !jaContadosSem.has(r.data)) {
-        jaContadosSem.add(r.data);
-        const h = parseInt(r.entrada.split(':')[0]);
-        const s = parseInt(r.saida.split(':')[0]);
-        // 1 registo = 1 periodo; with pausa = 2 periodos
-        const p = (r.pausa_inicio && r.pausa_fim) ? 2 : 1;
-        periodosFdS += p;
-      }
+    const dataInicioSemDate = new Date(agora); dataInicioSemDate.setDate(agora.getDate()-28);
+    const dataInicioSemStr = dateToISO(dataInicioSemDate);
+    const dispsSem = await db(`disponibilidades?monitor_id=eq.${monitorId}&dia=gte.${dataInicioSemStr}&dia=lte.${dataFimSem}`) || [];
+    // Count unique weeks with any FDS availability
+    const semanasComDisp = new Set();
+    dispsSem.forEach(d => {
+      const dow = new Date(d.dia+'T12:00:00').getDay();
+      if (dow === 0 || dow === 6) semanasComDisp.add(d.semana_inicio || d.dia);
     });
-    const sem = periodosFdS>=9?{emoji:'🟢',label:'Boa disponibilidade',cor:'#C8E6C9'}:
-                periodosFdS>=5?{emoji:'🟡',label:'Disponibilidade média',cor:'#FFF9C4'}:
+    const nSemanasDisp = semanasComDisp.size;
+    const sem = nSemanasDisp>=4?{emoji:'🟢',label:'Boa disponibilidade',cor:'#C8E6C9'}:
+                nSemanasDisp>=2?{emoji:'🟡',label:'Disponibilidade média',cor:'#FFF9C4'}:
                 {emoji:'🔴',label:'Pouca disponibilidade',cor:'#FFCDD2'};
 
     // Build HTML
@@ -2385,7 +2380,7 @@ async function abrirPerfilMonitorExterno(monitorId, nomeMonitor) {
         <span style="font-size:32px;">${sem.emoji}</span>
         <div>
           <div style="font-weight:600;font-size:14px;">${sem.label}</div>
-          <div style="font-size:12px;color:var(--muted);">${periodosFdS} período${periodosFdS!==1?'s':''} em fins de semana (últimas 4 semanas)</div>
+          <div style="font-size:12px;color:var(--muted);">${nSemanasDisp} semana${nSemanasDisp!==1?'s':''} com disponibilidade dada em FDS (últimas 4 semanas)</div>
         </div>
       </div>`;
 
@@ -2565,7 +2560,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       html += '<div class="empty" style="margin-bottom:1rem;">Sem disponibilidades registadas nas últimas 4 semanas.</div>';
     } else {
       const colStyle = (n) => {
-        const bg = n===0?'#FFCDD2':n===1?'#FFF9C4':n>=2?'#C8E6C9':'';
+        const bg = n<=1?'#FFCDD2':n<=3?'#FFF9C4':'#C8E6C9';
         return `background:${bg};`;
       };
       html += `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1.5rem;">
@@ -2582,7 +2577,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
           <td style="padding:10px;border:1px solid var(--border);text-align:center;font-size:18px;font-weight:700;${colStyle(counts.dom_t)}">${counts.dom_t}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
         </tr></tbody>
       </table>
-      <p style="font-size:11px;color:var(--muted);margin-top:-1.2rem;margin-bottom:1rem;">🔴 = 0 · 🟡 = 1 · 🟢 = 2+</p>`;
+      <p style="font-size:11px;color:var(--muted);margin-top:-1.2rem;margin-bottom:1rem;">🔴 = 0–1 semanas · 🟡 = 2–3 semanas · 🟢 = 4 semanas</p>`;
     }
 
     document.getElementById('perfilConteudo').innerHTML = html;
