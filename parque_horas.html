@@ -1307,64 +1307,8 @@ async function renderMonitores(el) {
   const em=document.createElement('div'); em.id='gErro'; em.className='msg erro'; el.appendChild(em);
   if (!monitoresCache.length) { el.innerHTML+='<div class="empty">Sem monitores. Adicione o primeiro acima.</div>'; return; }
 
-  // Semaforo geral para monitores
+  // Resumo disponibilidade para monitores
   if (gestorTipo === 'monitores') {
-    const agora = new Date();
-    const dataFim = dateToISO(agora);
-    const dataInicioDate = new Date(agora); dataInicioDate.setDate(agora.getDate()-28);
-    const dataInicio = dateToISO(dataInicioDate);
-    const regsFS = await db(`registos?data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&equipa=eq.monitores&select=monitor_nome,data,pausa_inicio,pausa_fim`) || [];
-    const periodosPorMonitor = {};
-    monitoresCache.filter(m => m.equipa === 'monitores').forEach(m => periodosPorMonitor[m.nome] = 0);
-    regsFS.forEach(r => {
-      if (!(r.monitor_nome in periodosPorMonitor)) return; // skip if not a monitor
-      const dow = new Date(r.data+'T12:00:00').getDay();
-      if (dow === 0 || dow === 6) {
-        const p = (r.pausa_inicio && r.pausa_fim) ? 2 : 1;
-        periodosPorMonitor[r.monitor_nome] = (periodosPorMonitor[r.monitor_nome] || 0) + p;
-      }
-    });
-    // Build semaforo table (hidden by default)
-    const semDiv = document.createElement('div');
-    semDiv.style.cssText = 'margin-bottom:1.5rem;';
-    const btnSem = document.createElement('button');
-    btnSem.textContent = '📊 Ver semáforo de disponibilidade';
-    btnSem.style.cssText = 'font-size:13px;padding:8px 14px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:"DM Sans",sans-serif;margin-bottom:8px;width:100%;text-align:left;';
-    const semConteudo = document.createElement('div');
-    semConteudo.style.display = 'none';
-    semConteudo.innerHTML = `<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">🔴 &lt;5 · 🟡 5-8 · 🟢 9+ períodos nos fins de semana (últimas 4 semanas)</p>`;
-    btnSem.onclick = () => {
-      const isOpen = semConteudo.style.display !== 'none';
-      semConteudo.style.display = isOpen ? 'none' : 'block';
-      btnSem.textContent = isOpen ? '📊 Ver semáforo de disponibilidade' : '📊 Fechar semáforo';
-    };
-    // Group by color
-    const vermelhos = [], amarelos = [], verdes = [];
-    Object.entries(periodosPorMonitor).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([nome, n]) => {
-      if (n >= 9) verdes.push(nome);
-      else if (n >= 5) amarelos.push(nome);
-      else vermelhos.push(nome);
-    });
-    const maxRows = Math.max(vermelhos.length, amarelos.length, verdes.length);
-    const t = document.createElement('table');
-    t.style.cssText = 'width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1rem;';
-    t.innerHTML = `<thead><tr>
-      <th style="padding:8px;border:1px solid var(--border);text-align:center;background:#FFCDD2;font-size:16px;">🔴</th>
-      <th style="padding:8px;border:1px solid var(--border);text-align:center;background:#FFF9C4;font-size:16px;">🟡</th>
-      <th style="padding:8px;border:1px solid var(--border);text-align:center;background:#C8E6C9;font-size:16px;">🟢</th>
-    </tr></thead>`;
-    const tb = document.createElement('tbody');
-    for (let i = 0; i < maxRows; i++) {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td style="padding:6px 8px;border:1px solid var(--border);font-size:12px;background:#FFCDD220;">${vermelhos[i]||''}</td>
-        <td style="padding:6px 8px;border:1px solid var(--border);font-size:12px;background:#FFF9C420;">${amarelos[i]||''}</td>
-        <td style="padding:6px 8px;border:1px solid var(--border);font-size:12px;background:#C8E6C920;">${verdes[i]||''}</td>`;
-      tb.appendChild(tr);
-    }
-    t.appendChild(tb); semConteudo.appendChild(t);
-    semDiv.appendChild(btnSem); semDiv.appendChild(semConteudo); el.appendChild(semDiv);
-
     // ---- Resumo disponibilidade últimas 4 semanas ----
     const dispDiv = document.createElement('div');
     dispDiv.style.cssText = 'margin-bottom:1.5rem;';
@@ -1510,33 +1454,56 @@ async function carregarMeuHorario() {
       db(`registos?monitor_id=eq.${monitorAtual.id}&data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&select=data,entrada,saida,pausa_inicio,pausa_fim`) || []
     ]);
 
-    let total = 0;
-    const jaContados = new Set();
-
-    // Count only approved registos on weekends - 1 registo = 1 periodo
-    // Exception: if registo has pausa (worked both shifts) = 2 periodos
-    regsAprov.forEach(r => {
-      if (!r.data || !r.entrada || !r.saida) return;
-      const dow = new Date(r.data+'T12:00:00').getDay();
-      if (dow === 0 || dow === 6) {
-        const periodos = (r.pausa_inicio && r.pausa_fim) ? 2 : 1;
-        total += periodos;
+    // Count availability slots from disponibilidades
+    const slotCounts = {sab_m:new Set(), sab_t:new Set(), dom_m:new Set(), dom_t:new Set()};
+    (disps||[]).forEach(d => {
+      const dow = new Date(d.dia+'T12:00:00').getDay();
+      const sem = d.semana_inicio || d.dia;
+      const per = d.periodo;
+      if (dow === 6) {
+        if (per==='manha'||per==='dia_inteiro') slotCounts.sab_m.add(sem);
+        if (per==='tarde'||per==='dia_inteiro') slotCounts.sab_t.add(sem);
+      } else if (dow === 0) {
+        if (per==='manha'||per==='dia_inteiro') slotCounts.dom_m.add(sem);
+        if (per==='tarde'||per==='dia_inteiro') slotCounts.dom_t.add(sem);
       }
     });
+    const sm=slotCounts.sab_m.size, st=slotCounts.sab_t.size, dm=slotCounts.dom_m.size, dt=slotCounts.dom_t.size;
+    const semanasComDisp = new Set([...slotCounts.sab_m,...slotCounts.sab_t,...slotCounts.dom_m,...slotCounts.dom_t]);
+    const nSemanas = semanasComDisp.size;
 
     let semaforo, cor, msg;
-    if (total >= 9) { semaforo='🟢'; cor='#C8E6C9'; msg='Boa disponibilidade — obrigado!'; }
-    else if (total >= 5) { semaforo='🟡'; cor='#FFF9C4'; msg='Disponibilidade média — tenta aumentar nos próximos fins de semana.'; }
+    if (nSemanas >= 4) { semaforo='🟢'; cor='#C8E6C9'; msg='Boa disponibilidade — obrigado!'; }
+    else if (nSemanas >= 2) { semaforo='🟡'; cor='#FFF9C4'; msg='Disponibilidade média — tenta dar disponibilidade em mais fins de semana.'; }
     else { semaforo='🔴'; cor='#FFCDD2'; msg='Pouca disponibilidade — atenção, pode afetar a tua permanência na equipa.'; }
 
-    const nomeMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'][agora.getMonth()];
+    const cellS = (n) => {
+      const bg = n<=1?'#FFCDD2':n<=3?'#FFF9C4':'#C8E6C9';
+      return `padding:10px 4px;border:1px solid var(--border);text-align:center;font-size:18px;font-weight:700;background:${bg};`;
+    };
+
     el.innerHTML = `
-      <div style="background:${cor};border-radius:var(--radius-sm);padding:1.25rem;text-align:center;">
+      <div style="background:${cor};border-radius:var(--radius-sm);padding:1.25rem;text-align:center;margin-bottom:1rem;">
         <div style="font-size:48px;margin-bottom:8px;">${semaforo}</div>
-        <div style="font-size:22px;font-weight:700;margin-bottom:4px;">${total} período${total!==1?'s':''} em ${nomeMes}</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:4px;">${nSemanas} semana${nSemanas!==1?'s':''} com disponibilidade dada em FDS</div>
         <div style="font-size:13px;color:var(--text);margin-bottom:4px;">${msg}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 &lt;5 · 🟡 5-8 · 🟢 9+ períodos nos fins de semana (últimas 4 semanas)</div>
-      </div>`;
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 0–1 semanas · 🟡 2–3 semanas · 🟢 4 semanas (últimas 4 semanas)</div>
+      </div>
+      <p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Detalhe por slot (últimas 4 semanas)</p>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:0.5rem;">
+        <thead><tr>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb manhã</th>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb tarde</th>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Dom manhã</th>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Dom tarde</th>
+        </tr></thead>
+        <tbody><tr>
+          <td style="${cellS(sm)}">${sm}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
+          <td style="${cellS(st)}">${st}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
+          <td style="${cellS(dm)}">${dm}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
+          <td style="${cellS(dt)}">${dt}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
+        </tr></tbody>
+      </table>`;
   } catch(e) {
     el.innerHTML = '<div class="empty">Erro ao carregar.</div>';
   }
