@@ -862,15 +862,15 @@ async function carregarMonitor() {
     const hoje = regs.find(r => r.data === hojeISO());
     if (hoje) {
       const hs = hoje.saida ? `${hoje.entrada} → ${hoje.saida} · ${minStr(calcMin(hoje.entrada,hoje.saida))}` : `Entrada: ${hoje.entrada} — a decorrer`;
-      document.getElementById('statusHoje').textContent = `Hoje: ${hs}`;
-      document.getElementById('btnEntrada').disabled = true;
-      document.getElementById('btnSaida').disabled = !!hoje.saida;
+      const sh1 = document.getElementById('statusHoje'); if(sh1) sh1.textContent = `Hoje: ${hs}`;
+      const btnE1 = document.getElementById('btnEntrada'); if(btnE1) btnE1.disabled = true;
+      const btnS1 = document.getElementById('btnSaida'); if(btnS1) btnS1.disabled = !!hoje.saida;
     } else {
-      document.getElementById('statusHoje').textContent = 'Ainda não registou hoje.';
-      document.getElementById('btnEntrada').disabled = false;
-      document.getElementById('btnSaida').disabled = false;
+      const sh2 = document.getElementById('statusHoje'); if(sh2) sh2.textContent = 'Ainda não registou hoje.';
+      const btnE2 = document.getElementById('btnEntrada'); if(btnE2) btnE2.disabled = false;
+      const btnS2 = document.getElementById('btnSaida'); if(btnS2) btnS2.disabled = false;
     }
-  } catch(e) { document.getElementById('statusHoje').textContent = 'Erro ao carregar dados.'; }
+  } catch(e) { const sh = document.getElementById('statusHoje'); if(sh) sh.textContent = 'Erro ao carregar dados.'; }
 }
 function renderListaMonitor(regs) {
   const el = document.getElementById('listaMonitor');
