@@ -1509,7 +1509,8 @@ async function carregarMeuHorario() {
         </tr></tbody>
       </table>`;
   } catch(e) {
-    el.innerHTML = '<div class="empty">Erro ao carregar.</div>';
+    console.error('carregarMeuHorario erro:', e);
+    el.innerHTML = `<div class="empty">Erro ao carregar: ${e.message||e}</div>`;
   }
 }
 
