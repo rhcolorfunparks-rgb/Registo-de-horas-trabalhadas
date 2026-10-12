@@ -731,15 +731,14 @@ async function iniciarMonitor() {
     const pf2 = isInterno && document.getElementById('mPausa2Fim') ? document.getElementById('mPausa2Fim').value : '';
     if (ent && sai) {
       let total = calcMin(ent, sai);
-      let pausaMin = (pi && pf ? calcMin(pi, pf) : 0) + (pi2 && pf2 ? calcMin(pi2, pf2) : 0);
+      let pausaMin = (pi && pf ? calcMin(pi, pf) : 0); // só almoço desconta
       const liquido = Math.max(total - pausaMin, 0);
       if (total > 0) {
-        let pausaDesc = '';
-        if (pi && pf && pi2 && pf2) pausaDesc = `Almoço: ${minStr(pi&&pf?calcMin(pi,pf):0)} + Lanche: ${minStr(pi2&&pf2?calcMin(pi2,pf2):0)}`;
-        else if (pi && pf) pausaDesc = `Pausa: ${minStr(calcMin(pi,pf))}`;
+        let pausaDesc = pi && pf ? `Almoço: ${minStr(calcMin(pi,pf))}` : '';
+        const lancheDesc = pi2 && pf2 ? ` · Lanche: ${minStr(calcMin(pi2,pf2))} (não descontado)` : '';
         document.getElementById('mPreview').textContent = pausaDesc
-          ? `Total: ${minStr(total)} − ${pausaDesc} = ${minStr(liquido)} efetivas`
-          : `Total: ${minStr(total)}`;
+          ? `Total: ${minStr(total)} − ${pausaDesc} = ${minStr(liquido)} efetivas${lancheDesc}`
+          : `Total: ${minStr(total)}${lancheDesc}`;
       }
     }
   };
@@ -786,7 +785,7 @@ function renderTotalFuncaoMonitor(regs) {
   regs.filter(r=>r.estado==='aprovado'&&r.saida&&r.entrada).forEach(r=>{
     const f = r.funcao||'—';
     const bruto = calcMin(r.entrada,r.saida);
-    const pausa = (r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
+    const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
     minsPorFuncao[f] = (minsPorFuncao[f]||0) + Math.max(bruto-pausa,0);
   });
   if (!Object.keys(minsPorFuncao).length) { el.style.display='none'; return; }
@@ -879,7 +878,7 @@ function renderListaMonitor(regs) {
     const d = document.createElement('div'); d.className = 'reg-row';
     const est = r.estado||'pendente';
     const bruto = r.saida && r.entrada ? calcMin(r.entrada,r.saida) : 0;
-    const pausaMin = (r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio,r.pausa_fim) : 0) + (r.pausa2_inicio && r.pausa2_fim ? calcMin(r.pausa2_inicio,r.pausa2_fim) : 0);
+    const pausaMin = r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio,r.pausa_fim) : 0; // só almoço desconta
     const h = r.saida ? minStr(Math.max(bruto-pausaMin,0)) : 'em curso';
     const fc = r.funcao||'';
     const tipoDia = r.tipo_dia && r.tipo_dia !== 'normal' ? r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1) : '';
@@ -1136,7 +1135,7 @@ async function renderTab() {
       startOfWeek.setDate(d.getDate() - dow);
       const weekKey = `${r.monitor_nome}_${dateToISO(startOfWeek)}`;
       const bruto = calcMin(r.entrada, r.saida);
-      const pausa = (r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio, r.pausa_fim) : 0) + (r.pausa2_inicio && r.pausa2_fim ? calcMin(r.pausa2_inicio, r.pausa2_fim) : 0);
+      const pausa = r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio, r.pausa_fim) : 0; // só almoço desconta
       const liq = Math.max(bruto - pausa, 0);
       if (!horasSemanais[r.monitor_nome]) horasSemanais[r.monitor_nome] = {};
       horasSemanais[r.monitor_nome][weekKey] = (horasSemanais[r.monitor_nome][weekKey] || 0) + liq;
@@ -1153,7 +1152,7 @@ async function renderTab() {
   regs.forEach(r => {
     const tr = document.createElement('tr');
     const brutoMin = r.saida && r.entrada ? calcMin(r.entrada,r.saida) : 0;
-    const pMin = (r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio,r.pausa_fim) : 0) + (r.pausa2_inicio && r.pausa2_fim ? calcMin(r.pausa2_inicio,r.pausa2_fim) : 0);
+    const pMin = r.pausa_inicio && r.pausa_fim ? calcMin(r.pausa_inicio,r.pausa_fim) : 0; // só almoço desconta
     const h = r.saida ? minStr(Math.max(brutoMin-pMin,0)) : '—';
     let ac='';
     if (tabAtiva==='pendente') ac=`<button class="btn-act edit" onclick="abrirModal('${r.id}')">Editar</button><button class="btn-act apr" onclick="mudarEstado('${r.id}','aprovado')">Aprovar</button><button class="btn-act rej" onclick="alertarMonitorRegisto('${r.id}','${r.monitor_nome}')">⚠️ Alertar</button><button class="btn-act" onclick="eliminarRegisto('${r.id}')" style="color:var(--muted);border-color:var(--border);">Eliminar</button>`;
@@ -2322,7 +2321,7 @@ async function abrirPerfilMonitorExterno(monitorId, nomeMonitor) {
         if(!r.entrada||!r.saida) return;
         const f = r.funcao||'—';
         const bruto = calcMin(r.entrada,r.saida);
-        const pausa = (r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
+        const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
         minsPorFuncao[f] = (minsPorFuncao[f]||0)+Math.max(bruto-pausa,0);
       });
       const totalMins = Object.values(minsPorFuncao).reduce((a,b)=>a+b,0);
@@ -2403,7 +2402,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       const semKey = dateToISO(seg);
       if (!semanas[semKey]) semanas[semKey] = {regs:[], mins:0};
       const bruto = r.entrada && r.saida ? calcMin(r.entrada,r.saida) : 0;
-      const pausa = (r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
+      const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
       const liq = Math.max(bruto-pausa,0);
       semanas[semKey].regs.push(r);
       semanas[semKey].mins += liq;
@@ -2425,7 +2424,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
           </div>
           ${s.regs.map(r=>{
             const bruto=r.entrada&&r.saida?calcMin(r.entrada,r.saida):0;
-            const pausa=(r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
+            const pausa=r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
             const liq=Math.max(bruto-pausa,0);
             const tipoDia = r.tipo_dia&&r.tipo_dia!=='normal'?` · ${r.tipo_dia.charAt(0).toUpperCase()+r.tipo_dia.slice(1)}`:'';
             let pausaStr='';
@@ -2450,7 +2449,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       const regsM2 = regs.filter(r=>r.data>=m.inicio&&r.data<=m.fim);
       const totalMins = regsM2.reduce((acc,r)=>{
         const bruto=r.entrada&&r.saida?calcMin(r.entrada,r.saida):0;
-        const pausa=(r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
+        const pausa=r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
         return acc+Math.max(bruto-pausa,0);
       },0);
       if (!totalMins) return;
@@ -2611,12 +2610,11 @@ function abrirModal(id) {
     const pi2=document.getElementById('modalPausa2Inicio')?document.getElementById('modalPausa2Inicio').value:'';
     const pf2=document.getElementById('modalPausa2Fim')?document.getElementById('modalPausa2Fim').value:'';
     const bruto=e&&s&&calcMin(e,s)>0?calcMin(e,s):0;
-    const pausaMin=(pi&&pf?calcMin(pi,pf):0)+(pi2&&pf2?calcMin(pi2,pf2):0);
+    const pausaMin=pi&&pf?calcMin(pi,pf):0; // só almoço desconta
     const liq=Math.max(bruto-pausaMin,0);
-    let pausaDesc='';
-    if(pi&&pf&&pi2&&pf2) pausaDesc=`Almoço: ${minStr(pi&&pf?calcMin(pi,pf):0)} + Lanche: ${minStr(pi2&&pf2?calcMin(pi2,pf2):0)}`;
-    else if(pi&&pf) pausaDesc=`Pausa: ${minStr(calcMin(pi,pf))}`;
-    document.getElementById('modalPreview').textContent=e&&s&&bruto>0?(pausaDesc?`Total: ${minStr(bruto)} − ${pausaDesc} = ${minStr(liq)} efetivas`:`Total: ${minStr(bruto)}`):(e&&s?'Saída deve ser após entrada.':'');
+    const pausaDesc=pi&&pf?`Almoço: ${minStr(calcMin(pi,pf))}`:'';
+    const lancheDesc=pi2&&pf2?` · Lanche: ${minStr(calcMin(pi2,pf2))} (não descontado)`:'';
+    document.getElementById('modalPreview').textContent=e&&s&&bruto>0?(pausaDesc?`Total: ${minStr(bruto)} − ${pausaDesc} = ${minStr(liq)} efetivas${lancheDesc}`:`Total: ${minStr(bruto)}${lancheDesc}`):(e&&s?'Saída deve ser após entrada.':'');
   };
   document.getElementById('modalEntrada').oninput=upd; document.getElementById('modalSaida').oninput=upd;
   if(document.getElementById('modalPausaInicio')) { document.getElementById('modalPausaInicio').oninput=upd; document.getElementById('modalPausaFim').oninput=upd; }
@@ -2652,7 +2650,7 @@ function exportarCSV() {
   let csv='Monitor,Data,Tipo,Função,Parque,Entrada,Início Pausa Almoço,Fim Pausa Almoço,Início Pausa Lanche,Fim Pausa Lanche,Saída,Horas,Observações\n';
   regs.forEach(r=>{
     const bruto=r.entrada&&r.saida?calcMin(r.entrada,r.saida):0;
-    const pausa=(r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
+    const pausa=r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
     const liq=Math.max(bruto-pausa,0);
     csv+=`"${r.monitor_nome}",${fmtData(r.data)},${r.tipo_dia||'normal'},"${r.funcao||'—'}","${r.parque||'—'}",${r.entrada||''},${r.pausa_inicio||''},${r.pausa_fim||''},${r.pausa2_inicio||''},${r.pausa2_fim||''},${r.saida||''},${(liq/60).toFixed(2)},"${r.observacoes||''}"\n`;
   });
@@ -2762,7 +2760,7 @@ function gerarFolhasPontoPDF() {
           let firstRow = true;
           diaDados.forEach(reg => {
             const min = reg.entrada&&reg.saida?calcMin(reg.entrada,reg.saida):0;
-            const pausaMin = (reg.pausa_inicio&&reg.pausa_fim?calcMin(reg.pausa_inicio,reg.pausa_fim):0) + (reg.pausa2_inicio&&reg.pausa2_fim?calcMin(reg.pausa2_inicio,reg.pausa2_fim):0);
+            const pausaMin = reg.pausa_inicio&&reg.pausa_fim?calcMin(reg.pausa_inicio,reg.pausa_fim):0; // só almoço desconta
             const liq = Math.max(min-pausaMin, 0);
             totalMin += liq;
             if (firstRow) { diasTrab++; firstRow = false; }
@@ -2792,7 +2790,7 @@ function gerarFolhasPontoPDF() {
       regs.filter(r=>r.saida&&r.entrada&&r.tipo_dia!=='ferias').forEach(r=>{
         const f = r.funcao||'—';
         const bruto = calcMin(r.entrada,r.saida);
-        const pausa = (r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0)+(r.pausa2_inicio&&r.pausa2_fim?calcMin(r.pausa2_inicio,r.pausa2_fim):0);
+        const pausa = r.pausa_inicio&&r.pausa_fim?calcMin(r.pausa_inicio,r.pausa_fim):0;
         minsPorFuncao[f] = (minsPorFuncao[f]||0) + Math.max(bruto-pausa,0);
       });
       const funcaoRows = Object.entries(minsPorFuncao).map(([f,m])=>`<tr><td style="text-align:left;padding:4px 6px;">${f}</td><td style="padding:4px 6px;">${Math.floor(m/60)}:${String(m%60).padStart(2,'0')}</td></tr>`).join('');
