@@ -1574,11 +1574,11 @@ function formularioBloqueadoParaMonitor() {
 }
 
 function formularioBloqueado() {
-  // Blocked: from Sunday 23:59 onwards (form closes Sunday, reopens Tuesday)
+  // Blocked: from Monday 23:59 onwards (form closes Monday, reopens Tuesday)
   const agora = new Date();
-  const dow = agora.getDay(); // 0 = Sunday, 1 = Monday
-  if (dow === 0 && agora.getHours() === 23 && agora.getMinutes() >= 59) return true;
-  if (dow === 1) return true; // all day Monday is blocked
+  const dow = agora.getDay(); // 0 = Sunday, 1 = Monday, 2 = Tuesday
+  if (dow === 1 && agora.getHours() === 23 && agora.getMinutes() >= 59) return true;
+  if (dow === 2) return true; // all day Tuesday is blocked
   return false;
 }
 
@@ -1797,8 +1797,8 @@ function renderDispView(el, inicio, fim) {
   el.innerHTML = '';
 
   // Header
-  // Bloqueado se: o domingo ANTERIOR ao início da semana já passou
-  // (prazo fecha no domingo antes da terça de início)
+  // Bloqueado se: a segunda ANTERIOR ao início da semana já passou
+  // (prazo fecha na segunda antes da terça de início)
   const agora = new Date();
   const segundaAnterior = new Date(inicio);
   segundaAnterior.setDate(inicio.getDate() - 1); // dia antes da terça = segunda
