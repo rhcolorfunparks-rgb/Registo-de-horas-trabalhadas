@@ -1364,6 +1364,83 @@ async function renderMonitores(el) {
     }
     t.appendChild(tb); semConteudo.appendChild(t);
     semDiv.appendChild(btnSem); semDiv.appendChild(semConteudo); el.appendChild(semDiv);
+
+    // ---- Resumo disponibilidade últimas 4 semanas ----
+    const dispDiv = document.createElement('div');
+    dispDiv.style.cssText = 'margin-bottom:1.5rem;';
+    const btnDisp = document.createElement('button');
+    btnDisp.textContent = '📅 Ver resumo de disponibilidade (4 semanas)';
+    btnDisp.style.cssText = 'font-size:13px;padding:8px 14px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:"DM Sans",sans-serif;margin-bottom:8px;width:100%;text-align:left;';
+    const dispConteudo = document.createElement('div');
+    dispConteudo.style.display = 'none';
+    let dispLoaded = false;
+    btnDisp.onclick = async () => {
+      const isOpen = dispConteudo.style.display !== 'none';
+      if (isOpen) {
+        dispConteudo.style.display = 'none';
+        btnDisp.textContent = '📅 Ver resumo de disponibilidade (4 semanas)';
+        return;
+      }
+      dispConteudo.style.display = 'block';
+      btnDisp.textContent = '📅 Fechar resumo de disponibilidade';
+      if (dispLoaded) return;
+      dispLoaded = true;
+      dispConteudo.innerHTML = '<div class="loading" style="font-size:13px;padding:8px;">A carregar...</div>';
+      try {
+        const agora = new Date();
+        const dataFim = dateToISO(agora);
+        const dataInicioDate = new Date(agora); dataInicioDate.setDate(agora.getDate()-28);
+        const dataInicio = dateToISO(dataInicioDate);
+        const allDisps = await db(`disponibilidades?dia=gte.${dataInicio}&dia=lte.${dataFim}`) || [];
+        // Build counts per monitor
+        const monitoresExt = monitoresCache.filter(m => !m.equipa || m.equipa === 'monitores');
+        const dispPorMonitor = {};
+        monitoresExt.forEach(m => { dispPorMonitor[m.nome] = {sab_m:new Set(), sab_t:new Set(), dom_m:new Set(), dom_t:new Set()}; });
+        allDisps.forEach(d => {
+          const dow = new Date(d.dia+'T12:00:00').getDay();
+          const sem = d.semana_inicio || d.dia;
+          const per = d.periodo;
+          const nome = d.monitor_nome;
+          if (!dispPorMonitor[nome]) return;
+          if (dow === 6) {
+            if (per==='manha'||per==='dia_inteiro') dispPorMonitor[nome].sab_m.add(sem);
+            if (per==='tarde'||per==='dia_inteiro') dispPorMonitor[nome].sab_t.add(sem);
+          } else if (dow === 0) {
+            if (per==='manha'||per==='dia_inteiro') dispPorMonitor[nome].dom_m.add(sem);
+            if (per==='tarde'||per==='dia_inteiro') dispPorMonitor[nome].dom_t.add(sem);
+          }
+        });
+        const cellStyle = (n) => {
+          const bg = n===0?'background:#FFCDD2;':n===1?'background:#FFF9C4;':'background:#C8E6C9;';
+          return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:600;${bg}`;
+        };
+        let tbl = `<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">🔴 = 0 · 🟡 = 1 · 🟢 = 2+&nbsp;&nbsp;(nº de semanas com disponibilidade, máx 4)</p>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;">
+          <thead><tr>
+            <th style="padding:6px 8px;border:1px solid var(--border);text-align:left;background:var(--surface);">Monitor</th>
+            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb manhã</th>
+            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb tarde</th>
+            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom manhã</th>
+            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom tarde</th>
+          </tr></thead><tbody>`;
+        Object.entries(dispPorMonitor).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([nome, c]) => {
+          const sm=c.sab_m.size, st=c.sab_t.size, dm=c.dom_m.size, dt=c.dom_t.size;
+          tbl += `<tr>
+            <td style="padding:6px 8px;border:1px solid var(--border);font-size:12px;">${nome}</td>
+            <td style="${cellStyle(sm)}">${sm}</td>
+            <td style="${cellStyle(st)}">${st}</td>
+            <td style="${cellStyle(dm)}">${dm}</td>
+            <td style="${cellStyle(dt)}">${dt}</td>
+          </tr>`;
+        });
+        tbl += '</tbody></table>';
+        dispConteudo.innerHTML = tbl;
+      } catch(e) {
+        dispConteudo.innerHTML = '<div class="empty">Erro ao carregar disponibilidades.</div>';
+      }
+    };
+    dispDiv.appendChild(btnDisp); dispDiv.appendChild(dispConteudo); el.appendChild(dispDiv);
+
     const divider = document.createElement('p');
     divider.style.cssText = 'font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;padding-top:1rem;border-top:1px solid var(--border);';
     divider.textContent = 'Lista de monitores';
@@ -2460,6 +2537,53 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
         </div>
       </div>`;
     });
+
+    // ---- Disponibilidade últimas 4 semanas ----
+    const agora4 = new Date();
+    const dataFim4 = dateToISO(agora4);
+    const dataInicio4Date = new Date(agora4); dataInicio4Date.setDate(agora4.getDate()-28);
+    const dataInicio4 = dateToISO(dataInicio4Date);
+    const disps4 = await db(`disponibilidades?monitor_id=eq.${monitorId}&dia=gte.${dataInicio4}&dia=lte.${dataFim4}`) || [];
+    // Count per slot: sab_m, sab_t, dom_m, dom_t
+    const counts = {sab_m:0, sab_t:0, dom_m:0, dom_t:0};
+    const seenWeeks = {sab_m:new Set(), sab_t:new Set(), dom_m:new Set(), dom_t:new Set()};
+    disps4.forEach(d => {
+      const dow = new Date(d.dia+'T12:00:00').getDay(); // 0=Dom,6=Sab
+      const sem = d.semana_inicio || d.dia;
+      const per = d.periodo; // 'manha','tarde','dia_inteiro'
+      if (dow === 6) { // Sábado
+        if ((per==='manha'||per==='dia_inteiro') && !seenWeeks.sab_m.has(sem)) { seenWeeks.sab_m.add(sem); counts.sab_m++; }
+        if ((per==='tarde'||per==='dia_inteiro') && !seenWeeks.sab_t.has(sem)) { seenWeeks.sab_t.add(sem); counts.sab_t++; }
+      } else if (dow === 0) { // Domingo
+        if ((per==='manha'||per==='dia_inteiro') && !seenWeeks.dom_m.has(sem)) { seenWeeks.dom_m.add(sem); counts.dom_m++; }
+        if ((per==='tarde'||per==='dia_inteiro') && !seenWeeks.dom_t.has(sem)) { seenWeeks.dom_t.add(sem); counts.dom_t++; }
+      }
+    });
+    const totalDisps = counts.sab_m + counts.sab_t + counts.dom_m + counts.dom_t;
+    html += `<p style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;padding-top:1rem;border-top:1px solid var(--border);">Disponibilidade dada — últimas 4 semanas</p>`;
+    if (!totalDisps && !disps4.length) {
+      html += '<div class="empty" style="margin-bottom:1rem;">Sem disponibilidades registadas nas últimas 4 semanas.</div>';
+    } else {
+      const colStyle = (n) => {
+        const bg = n===0?'#FFCDD2':n===1?'#FFF9C4':n>=2?'#C8E6C9':'';
+        return `background:${bg};`;
+      };
+      html += `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1.5rem;">
+        <thead><tr>
+          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Sáb manhã</th>
+          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Sáb tarde</th>
+          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Dom manhã</th>
+          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Dom tarde</th>
+        </tr></thead>
+        <tbody><tr>
+          <td style="padding:10px;border:1px solid var(--border);text-align:center;font-size:18px;font-weight:700;${colStyle(counts.sab_m)}">${counts.sab_m}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
+          <td style="padding:10px;border:1px solid var(--border);text-align:center;font-size:18px;font-weight:700;${colStyle(counts.sab_t)}">${counts.sab_t}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
+          <td style="padding:10px;border:1px solid var(--border);text-align:center;font-size:18px;font-weight:700;${colStyle(counts.dom_m)}">${counts.dom_m}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
+          <td style="padding:10px;border:1px solid var(--border);text-align:center;font-size:18px;font-weight:700;${colStyle(counts.dom_t)}">${counts.dom_t}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
+        </tr></tbody>
+      </table>
+      <p style="font-size:11px;color:var(--muted);margin-top:-1.2rem;margin-bottom:1rem;">🔴 = 0 · 🟡 = 1 · 🟢 = 2+</p>`;
+    }
 
     document.getElementById('perfilConteudo').innerHTML = html;
   } catch(e) {
