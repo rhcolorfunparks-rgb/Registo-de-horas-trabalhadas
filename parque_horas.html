@@ -1451,10 +1451,12 @@ async function carregarMeuHorario() {
     dataInicioDate.setDate(agora.getDate() - 28);
     const dataInicio = dateToISO(dataInicioDate);
     const dataFim = dateToISO(dataFimDate);
-    const [disps, regsAprov] = await Promise.all([
-      db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&dia=gte.${dataInicio}&dia=lte.${dataFim}`) || [],
-      db(`registos?monitor_id=eq.${monitorAtual.id}&data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&select=data,entrada,saida,pausa_inicio,pausa_fim`) || []
+    const [dispsRaw, regsAprovRaw] = await Promise.all([
+      db(`disponibilidades?monitor_id=eq.${monitorAtual.id}&dia=gte.${dataInicio}&dia=lte.${dataFim}`),
+      db(`registos?monitor_id=eq.${monitorAtual.id}&data=gte.${dataInicio}&data=lte.${dataFim}&estado=eq.aprovado&select=data,entrada,saida,pausa_inicio,pausa_fim`)
     ]);
+    const disps = dispsRaw || [];
+    const regsAprov = regsAprovRaw || [];
 
     // Count availability slots from disponibilidades
     const slotCounts = {sab_m:new Set(), sab_t:new Set(), dom_m:new Set(), dom_t:new Set()};
