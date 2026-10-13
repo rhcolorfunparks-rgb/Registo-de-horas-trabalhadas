@@ -1623,11 +1623,10 @@ function formularioBloqueadoParaMonitor() {
 }
 
 function formularioBloqueado() {
-  // Blocked: from Monday 23:59 onwards (form closes Monday, reopens Tuesday)
+  // Blocked: only Monday 23:59 (transition moment). Open Tue–Mon.
   const agora = new Date();
   const dow = agora.getDay(); // 0 = Sunday, 1 = Monday, 2 = Tuesday
   if (dow === 1 && agora.getHours() === 23 && agora.getMinutes() >= 59) return true;
-  if (dow === 2) return true; // all day Tuesday is blocked
   return false;
 }
 
