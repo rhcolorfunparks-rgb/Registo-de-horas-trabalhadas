@@ -1409,10 +1409,8 @@ async function carregarMeuHorario() {
     // Pesos por slot (máx 20pts em 4 semanas)
     // Sáb manhã=0.5, Sáb tarde=1.5, Dom manhã=1, Dom tarde=2
     // Penalização só em zeros, proporcional ao peso: slot=0 → -2×peso
-    const pesos = [0.5, 1.5, 1, 2];
-    const pontosBase = sm*0.5 + st*1.5 + dm*1 + dt*2;
-    const penalizacao = [sm,st,dm,dt].reduce((acc,v,i)=>acc+(v===0?2*pesos[i]:0),0);
-    const pontos = pontosBase - penalizacao;
+    // Pesos: sáb manhã=0.75, sáb tarde=1, dom manhã=1.25, dom tarde=2
+    const pontos = sm*0.75 + st*1 + dm*1.25 + dt*2;
     const pontosMax = 20;
 
     let semaforo, cor, msg;
@@ -2465,10 +2463,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       }
     });
     const totalDisps = counts.sab_m + counts.sab_t + counts.dom_m + counts.dom_t;
-    const pesosG = [0.5, 1.5, 1, 2];
-    const pontosBaseGestor = counts.sab_m*0.5 + counts.sab_t*1.5 + counts.dom_m*1 + counts.dom_t*2;
-    const penGestor = [counts.sab_m,counts.sab_t,counts.dom_m,counts.dom_t].reduce((acc,v,i)=>acc+(v===0?2*pesosG[i]:0),0);
-    const pontosPerfilGestor = pontosBaseGestor - penGestor;
+    const pontosPerfilGestor = counts.sab_m*0.75 + counts.sab_t*1 + counts.dom_m*1.25 + counts.dom_t*2;
     const semGestor = pontosPerfilGestor>=15?'🟢':pontosPerfilGestor>=10?'🟡':'🔴';
     const corGestor = pontosPerfilGestor>=15?'#C8E6C9':pontosPerfilGestor>=10?'#FFF9C4':'#FFCDD2';
     html += `<p style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;padding-top:1rem;border-top:1px solid var(--border);">Disponibilidade dada — últimas 4 semanas</p>`;
@@ -2619,12 +2614,9 @@ async function carregarTabelaPontos() {
         <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom tarde<div style="font-weight:400;color:var(--muted);">2pts</div></th>
         <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-weight:700;">Total</th>
       </tr></thead><tbody>`;
-    const pesosTab = [0.5, 1.5, 1, 2];
     const calcPts = (c) => {
       const sm=c.sab_m.size, st=c.sab_t.size, dm=c.dom_m.size, dt=c.dom_t.size;
-      const base=sm*0.5+st*1.5+dm*1+dt*2;
-      const pen=[sm,st,dm,dt].reduce((acc,v,i)=>acc+(v===0?2*pesosTab[i]:0),0);
-      return base-pen;
+      return sm*0.75 + st*1 + dm*1.25 + dt*2;
     };
     Object.entries(dispPorMonitor).sort((a,b)=>calcPts(b[1])-calcPts(a[1])).forEach(([nome, c]) => {
       const sm=c.sab_m.size, st=c.sab_t.size, dm=c.dom_m.size, dt=c.dom_t.size;
