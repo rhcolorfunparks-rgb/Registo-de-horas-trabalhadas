@@ -934,11 +934,14 @@ async function submeterRegisto() {
       ? (document.getElementById('mObs') ? document.getElementById('mObs').value.trim() || null : null)
       : (document.getElementById('mObsMonitor') ? document.getElementById('mObsMonitor').value.trim() || null : null);
     try {
-      // Check for duplicate - same monitor, same date, same entry time
-      const existentes = await db(`registos?monitor_id=eq.${monitorAtual.id}&data=eq.${data}&entrada=eq.${ent}&saida=eq.${sai}`) || [];
+      // Check for duplicate - any record for this monitor on this date (approved or pending)
+      const existentes = await db(`registos?monitor_id=eq.${monitorAtual.id}&data=eq.${data}&estado=neq.rejeitado`) || [];
       if (existentes.length > 0) {
         err.style.color = 'var(--red)';
-        return err.textContent = 'Já existe um registo com este horário para esta data. Verifique os seus registos recentes.';
+        const jaAprovado = existentes.some(r => r.estado === 'aprovado');
+        return err.textContent = jaAprovado
+          ? `Já existe um registo aprovado para ${fmtData(data)}. Contacte o gestor se precisar de corrigir.`
+          : `Já tem um registo pendente para ${fmtData(data)}. Aguarde a aprovação ou contacte o gestor.`;
       }
       await db('registos', {method:'POST', body:{monitor_id:monitorAtual.id, monitor_nome:monitorAtual.nome, data, entrada:ent, saida:sai, pausa_inicio:pausaInicio, pausa_fim:pausaFim, pausa2_inicio:pausa2Inicio, pausa2_fim:pausa2Fim, observacoes:obs, funcao, parque, equipa, tipo_dia:'normal', estado:'pendente'}});
       err.style.color = 'var(--green)'; err.textContent = 'Registo submetido com sucesso!';
@@ -1174,7 +1177,22 @@ async function renderTab() {
 
 }
 async function mudarEstado(id, estado) {
-  try { await db(`registos?id=eq.${id}`,{method:'PATCH',body:{estado},prefer:'return=minimal',headers:{}}); await carregarGestor(); } catch(e){}
+  try {
+    if (estado === 'aprovado') {
+      // Check for existing approved record for same monitor/date
+      const registo = registosCache.find(r => r.id === id);
+      if (registo) {
+        const duplicados = await db(`registos?monitor_id=eq.${registo.monitor_id}&data=eq.${registo.data}&estado=eq.aprovado&id=neq.${id}`) || [];
+        if (duplicados.length > 0) {
+          const dup = duplicados[0];
+          const confirmar = confirm(`⚠️ Duplicado detetado!\n\n${registo.monitor_nome} já tem um registo APROVADO para ${fmtData(registo.data)}:\n${dup.entrada} → ${dup.saida}\n\nTem a certeza que quer aprovar este registo (${registo.entrada} → ${registo.saida})?`);
+          if (!confirmar) return;
+        }
+      }
+    }
+    await db(`registos?id=eq.${id}`,{method:'PATCH',body:{estado},prefer:'return=minimal',headers:{}});
+    await carregarGestor();
+  } catch(e){}
 }
 async function apagarRegisto(id) {
   if (!confirm('Apagar este registo definitivamente?')) return;
@@ -1360,7 +1378,43 @@ async function renderMonitores(el) {
           const bg = n<=1?'background:#FFCDD2;':n<=3?'background:#FFF9C4;':'background:#C8E6C9;';
           return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:600;${bg}`;
         };
-        let tbl = `<p style="font-size:11px;color:var(--muted);margin-bottom:8px;">🔴 = 0–1 semanas · 🟡 = 2–3 semanas · 🟢 = 4 semanas (máx. 4 possíveis)</p>
+        const ptStyle = (p) => {
+          const bg = p<7?'background:#FFCDD2;':p<14?'background:#FFF9C4;':'background:#C8E6C9;';
+          return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:700;${bg}`;
+        };
+        // Tabela de pontos (ordenada por total desc)
+        let tbl = `<p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Classificação por pontos</p>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Dom tarde=2 · Sáb tarde=1.5 · Dom manhã=1 · Sáb manhã=0.5 · Máx 20pts &nbsp;|&nbsp; 🔴 &lt;7 · 🟡 7–13 · 🟢 ≥14</p>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:1.5rem;">
+          <thead><tr>
+            <th style="padding:6px 8px;border:1px solid var(--border);text-align:left;background:var(--surface);">Monitor</th>
+            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb manhã<div style="font-weight:400;color:var(--muted);">0.5pts</div></th>
+            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb tarde<div style="font-weight:400;color:var(--muted);">1.5pts</div></th>
+            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom manhã<div style="font-weight:400;color:var(--muted);">1pt</div></th>
+            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom tarde<div style="font-weight:400;color:var(--muted);">2pts</div></th>
+            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-weight:700;">Total</th>
+          </tr></thead><tbody>`;
+        const entradasOrdenadas = Object.entries(dispPorMonitor).sort((a,b)=>{
+          const pa=a[1].sab_m.size*0.5+a[1].sab_t.size*1.5+a[1].dom_m.size*1+a[1].dom_t.size*2;
+          const pb=b[1].sab_m.size*0.5+b[1].sab_t.size*1.5+b[1].dom_m.size*1+b[1].dom_t.size*2;
+          return pb-pa;
+        });
+        entradasOrdenadas.forEach(([nome, c]) => {
+          const sm=c.sab_m.size, st=c.sab_t.size, dm=c.dom_m.size, dt=c.dom_t.size;
+          const pts=sm*0.5+st*1.5+dm*1+dt*2;
+          tbl += `<tr>
+            <td style="padding:6px 8px;border:1px solid var(--border);font-size:12px;">${nome}</td>
+            <td style="${cellStyle(sm)}">${sm}</td>
+            <td style="${cellStyle(st)}">${st}</td>
+            <td style="${cellStyle(dm)}">${dm}</td>
+            <td style="${cellStyle(dt)}">${dt}</td>
+            <td style="${ptStyle(pts)}">${pts.toFixed(1)}</td>
+          </tr>`;
+        });
+        tbl += '</tbody></table>';
+        // Tabela de leitura rápida (ordenada alfabeticamente, sem coluna de pontos)
+        tbl += `<p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Leitura rápida por slot</p>
+        <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">🔴 = 0–1 semanas · 🟡 = 2–3 semanas · 🟢 = 4 semanas</p>
         <table style="width:100%;border-collapse:collapse;font-size:12px;">
           <thead><tr>
             <th style="padding:6px 8px;border:1px solid var(--border);text-align:left;background:var(--surface);">Monitor</th>
@@ -1473,15 +1527,17 @@ async function carregarMeuHorario() {
       }
     });
     const sm=slotCounts.sab_m.size, st=slotCounts.sab_t.size, dm=slotCounts.dom_m.size, dt=slotCounts.dom_t.size;
-    const semanasComDisp = new Set([...slotCounts.sab_m,...slotCounts.sab_t,...slotCounts.dom_m,...slotCounts.dom_t]);
-    const nSemanas = semanasComDisp.size;
+    // Opção A: pesos por slot (máx 20pts em 4 semanas)
+    // Dom tarde=2, Sáb tarde=1.5, Dom manhã=1, Sáb manhã=0.5
+    const pontos = sm*0.5 + st*1.5 + dm*1 + dt*2;
+    const pontosMax = 20;
 
     let semaforo, cor, msg;
-    if (nSemanas >= 4) { semaforo='🟢'; cor='#C8E6C9'; msg='Boa disponibilidade — obrigado!'; }
-    else if (nSemanas >= 2) { semaforo='🟡'; cor='#FFF9C4'; msg='Disponibilidade média — tenta dar disponibilidade em mais fins de semana.'; }
-    else { semaforo='🔴'; cor='#FFCDD2'; msg='Pouca disponibilidade — atenção, pode afetar a tua permanência na equipa.'; }
+    if (pontos >= 14) { semaforo='🟢'; cor='#C8E6C9'; msg='Boa disponibilidade — obrigado!'; }
+    else if (pontos >= 7) { semaforo='🟡'; cor='#FFF9C4'; msg='Disponibilidade média — tenta dar disponibilidade em mais fins de semana, especialmente domingo à tarde.'; }
+    else { semaforo='🔴'; cor='#FFCDD2'; msg='Pouca disponibilidade — quando temos muitos recursos, damos prioridade a quem está mais disponível de forma consistente.'; }
 
-    const cellS = (n) => {
+    const cellS = (n, peso) => {
       const bg = n<=1?'#FFCDD2':n<=3?'#FFF9C4':'#C8E6C9';
       return `padding:10px 4px;border:1px solid var(--border);text-align:center;font-size:18px;font-weight:700;background:${bg};`;
     };
@@ -1489,17 +1545,17 @@ async function carregarMeuHorario() {
     el.innerHTML = `
       <div style="background:${cor};border-radius:var(--radius-sm);padding:1.25rem;text-align:center;margin-bottom:1rem;">
         <div style="font-size:48px;margin-bottom:8px;">${semaforo}</div>
-        <div style="font-size:18px;font-weight:700;margin-bottom:4px;">${nSemanas} semana${nSemanas!==1?'s':''} com disponibilidade dada em FDS</div>
+        <div style="font-size:18px;font-weight:700;margin-bottom:4px;">${pontos.toFixed(1)} / ${pontosMax} pontos</div>
         <div style="font-size:13px;color:var(--text);margin-bottom:4px;">${msg}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 0–1 semanas · 🟡 2–3 semanas · 🟢 4 semanas (últimas 4 semanas)</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 &lt;7 pts · 🟡 7–13 pts · 🟢 ≥14 pts (últimas 4 semanas)</div>
       </div>
       <p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Detalhe por slot (últimas 4 semanas)</p>
       <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:0.5rem;">
         <thead><tr>
-          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb manhã</th>
-          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb tarde</th>
-          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Dom manhã</th>
-          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Dom tarde</th>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb manhã<div style="font-weight:400;color:var(--muted);">0.5 pts</div></th>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb tarde<div style="font-weight:400;color:var(--muted);">1.5 pts</div></th>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Dom manhã<div style="font-weight:400;color:var(--muted);">1 pt</div></th>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Dom tarde<div style="font-weight:400;color:var(--muted);">2 pts</div></th>
         </tr></thead>
         <tbody><tr>
           <td style="${cellS(sm)}">${sm}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
@@ -2526,6 +2582,9 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       }
     });
     const totalDisps = counts.sab_m + counts.sab_t + counts.dom_m + counts.dom_t;
+    const pontosPerfilGestor = counts.sab_m*0.5 + counts.sab_t*1.5 + counts.dom_m*1 + counts.dom_t*2;
+    const semGestor = pontosPerfilGestor>=14?'🟢':pontosPerfilGestor>=7?'🟡':'🔴';
+    const corGestor = pontosPerfilGestor>=14?'#C8E6C9':pontosPerfilGestor>=7?'#FFF9C4':'#FFCDD2';
     html += `<p style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;padding-top:1rem;border-top:1px solid var(--border);">Disponibilidade dada — últimas 4 semanas</p>`;
     if (!totalDisps && !disps4.length) {
       html += '<div class="empty" style="margin-bottom:1rem;">Sem disponibilidades registadas nas últimas 4 semanas.</div>';
@@ -2534,12 +2593,17 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
         const bg = n<=1?'#FFCDD2':n<=3?'#FFF9C4':'#C8E6C9';
         return `background:${bg};`;
       };
-      html += `<table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1.5rem;">
+      html += `<div style="background:${corGestor};border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <span style="font-size:24px;">${semGestor}</span>
+        <span style="font-size:15px;font-weight:700;">${pontosPerfilGestor.toFixed(1)} / 20 pontos</span>
+        <span style="font-size:11px;color:var(--muted);">🔴 &lt;7 · 🟡 7–13 · 🟢 ≥14</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1.5rem;">
         <thead><tr>
-          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Sáb manhã</th>
-          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Sáb tarde</th>
-          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Dom manhã</th>
-          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Dom tarde</th>
+          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Sáb manhã<div style="font-weight:400;font-size:10px;color:var(--muted);">0.5 pts</div></th>
+          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Sáb tarde<div style="font-weight:400;font-size:10px;color:var(--muted);">1.5 pts</div></th>
+          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Dom manhã<div style="font-weight:400;font-size:10px;color:var(--muted);">1 pt</div></th>
+          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Dom tarde<div style="font-weight:400;font-size:10px;color:var(--muted);">2 pts</div></th>
         </tr></thead>
         <tbody><tr>
           <td style="padding:10px;border:1px solid var(--border);text-align:center;font-size:18px;font-weight:700;${colStyle(counts.sab_m)}">${counts.sab_m}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
@@ -2547,8 +2611,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
           <td style="padding:10px;border:1px solid var(--border);text-align:center;font-size:18px;font-weight:700;${colStyle(counts.dom_m)}">${counts.dom_m}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
           <td style="padding:10px;border:1px solid var(--border);text-align:center;font-size:18px;font-weight:700;${colStyle(counts.dom_t)}">${counts.dom_t}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
         </tr></tbody>
-      </table>
-      <p style="font-size:11px;color:var(--muted);margin-top:-1.2rem;margin-bottom:1rem;">🔴 = 0–1 semanas · 🟡 = 2–3 semanas · 🟢 = 4 semanas</p>`;
+      </table>`;
     }
 
     document.getElementById('perfilConteudo').innerHTML = html;
