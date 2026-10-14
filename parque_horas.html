@@ -1407,12 +1407,11 @@ async function carregarMeuHorario() {
     });
     const sm=slotCounts.sab_m.size, st=slotCounts.sab_t.size, dm=slotCounts.dom_m.size, dt=slotCounts.dom_t.size;
     // Pesos por slot (máx 20pts em 4 semanas)
-    // Dom tarde=2.5, Dom manhã=1, Sáb tarde=1, Sáb manhã=0.5
-    // Penalização: slot=0 → -2pts, slot=1 → -1pt
-    const pontosBase = sm*0.5 + st*1 + dm*1 + dt*2.5;
-    // Penalização proporcional ao peso do slot: slot=0 → -2×peso, slot=1 → -1×peso
-    const pesos = [0.5, 1, 1, 2.5];
-    const penalizacao = [sm,st,dm,dt].reduce((acc,v,i)=>acc+(v===0?2:v===1?1:0)*pesos[i],0);
+    // Sáb manhã=0.5, Sáb tarde=1.5, Dom manhã=1, Dom tarde=2
+    // Penalização só em zeros, proporcional ao peso: slot=0 → -2×peso
+    const pesos = [0.5, 1.5, 1, 2];
+    const pontosBase = sm*0.5 + st*1.5 + dm*1 + dt*2;
+    const penalizacao = [sm,st,dm,dt].reduce((acc,v,i)=>acc+(v===0?2*pesos[i]:0),0);
     const pontos = pontosBase - penalizacao;
     const pontosMax = 20;
 
@@ -1437,9 +1436,9 @@ async function carregarMeuHorario() {
       <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:0.5rem;">
         <thead><tr>
           <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb manhã<div style="font-weight:400;color:var(--muted);">0.5 pts</div></th>
-          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb tarde<div style="font-weight:400;color:var(--muted);">1 pt</div></th>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb tarde<div style="font-weight:400;color:var(--muted);">1.5 pts</div></th>
           <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Dom manhã<div style="font-weight:400;color:var(--muted);">1 pt</div></th>
-          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Dom tarde<div style="font-weight:400;color:var(--muted);">2.5 pts</div></th>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Dom tarde<div style="font-weight:400;color:var(--muted);">2pts</div></th>
         </tr></thead>
         <tbody><tr>
           <td style="${cellS(sm)}">${sm}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
@@ -2466,9 +2465,9 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       }
     });
     const totalDisps = counts.sab_m + counts.sab_t + counts.dom_m + counts.dom_t;
-    const pontosBaseGestor = counts.sab_m*0.5 + counts.sab_t*1 + counts.dom_m*1 + counts.dom_t*2.5;
-    const pesosG = [0.5, 1, 1, 2.5];
-    const penGestor = [counts.sab_m,counts.sab_t,counts.dom_m,counts.dom_t].reduce((acc,v,i)=>acc+(v===0?2:v===1?1:0)*pesosG[i],0);
+    const pesosG = [0.5, 1.5, 1, 2];
+    const pontosBaseGestor = counts.sab_m*0.5 + counts.sab_t*1.5 + counts.dom_m*1 + counts.dom_t*2;
+    const penGestor = [counts.sab_m,counts.sab_t,counts.dom_m,counts.dom_t].reduce((acc,v,i)=>acc+(v===0?2*pesosG[i]:0),0);
     const pontosPerfilGestor = pontosBaseGestor - penGestor;
     const semGestor = pontosPerfilGestor>=13.5?'🟢':pontosPerfilGestor>=9.5?'🟡':'🔴';
     const corGestor = pontosPerfilGestor>=13.5?'#C8E6C9':pontosPerfilGestor>=9.5?'#FFF9C4':'#FFCDD2';
@@ -2490,7 +2489,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
           <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Sáb manhã<div style="font-weight:400;font-size:10px;color:var(--muted);">0.5 pts</div></th>
           <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Sáb tarde<div style="font-weight:400;font-size:10px;color:var(--muted);">1 pt</div></th>
           <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Dom manhã<div style="font-weight:400;font-size:10px;color:var(--muted);">1 pt</div></th>
-          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Dom tarde<div style="font-weight:400;font-size:10px;color:var(--muted);">2.5 pts</div></th>
+          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Dom tarde<div style="font-weight:400;font-size:10px;color:var(--muted);">2pts</div></th>
         </tr></thead>
         <tbody><tr>
           <td style="padding:10px;border:1px solid var(--border);text-align:center;font-size:18px;font-weight:700;${colStyle(counts.sab_m)}">${counts.sab_m}<span style="display:block;font-size:10px;font-weight:400;color:var(--muted);">/ 4</span></td>
@@ -2610,21 +2609,21 @@ async function carregarTabelaPontos() {
       return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:700;${bg}`;
     };
     let tbl = `<p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Classificação por pontos</p>
-    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Pontos por slot: Dom tarde=2.5 · Dom manhã=1 · Sáb tarde=1 · Sáb manhã=0.5 &nbsp;|&nbsp; Penalização por slot não dado (proporcional ao seu peso): nunca deu=−2×peso · só deu 1 vez=−1×peso &nbsp;|&nbsp; 🔴 &lt;9.5 · 🟡 9.5–13.5 · 🟢 ≥13.5</p>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Pontos por slot: Dom tarde=2 · Dom manhã=1 · Sáb tarde=1.5 · Sáb manhã=0.5 &nbsp;|&nbsp; Penalização por slot nunca dado: −2×peso &nbsp;|&nbsp; 🔴 &lt;9.5 · 🟡 9.5–13.5 · 🟢 ≥13.5</p>
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr>
         <th style="padding:6px 8px;border:1px solid var(--border);text-align:left;background:var(--surface);">Monitor</th>
         <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb manhã<div style="font-weight:400;color:var(--muted);">0.5pts</div></th>
-        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb tarde<div style="font-weight:400;color:var(--muted);">1pt</div></th>
+        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb tarde<div style="font-weight:400;color:var(--muted);">1.5pts</div></th>
         <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom manhã<div style="font-weight:400;color:var(--muted);">1pt</div></th>
-        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom tarde<div style="font-weight:400;color:var(--muted);">2.5pts</div></th>
+        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom tarde<div style="font-weight:400;color:var(--muted);">2pts</div></th>
         <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-weight:700;">Total</th>
       </tr></thead><tbody>`;
-    const pesosTab = [0.5, 1, 1, 2.5];
+    const pesosTab = [0.5, 1.5, 1, 2];
     const calcPts = (c) => {
       const sm=c.sab_m.size, st=c.sab_t.size, dm=c.dom_m.size, dt=c.dom_t.size;
-      const base=sm*0.5+st*1+dm*1+dt*2.5;
-      const pen=[sm,st,dm,dt].reduce((acc,v,i)=>acc+(v===0?2:v===1?1:0)*pesosTab[i],0);
+      const base=sm*0.5+st*1.5+dm*1+dt*2;
+      const pen=[sm,st,dm,dt].reduce((acc,v,i)=>acc+(v===0?2*pesosTab[i]:0),0);
       return base-pen;
     };
     Object.entries(dispPorMonitor).sort((a,b)=>calcPts(b[1])-calcPts(a[1])).forEach(([nome, c]) => {
