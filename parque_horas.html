@@ -1415,7 +1415,7 @@ async function carregarMeuHorario() {
     let semaforo, cor, msg;
     if (pontos >= 15) { semaforo='🟢'; cor='#C8E6C9'; msg='Boa disponibilidade — obrigado!'; }
     else if (pontos >= 10) { semaforo='🟡'; cor='#FFF9C4'; msg='Disponibilidade média — tenta dar mais disponibilidade.'; }
-    else { semaforo='🔴'; cor='#FFCDD2'; msg='Pouca disponibilidade — quando temos muitos recursos, damos prioridade a quem está mais disponível de forma consistente.'; }
+    else { semaforo='🔴'; cor='#FFCDD2'; msg='Pouca disponibilidade — quando temos muitos recursos, damos prioridade a quem está disponível de forma consistente em diferentes turnos.'; }
 
     const cellS = (n, peso) => {
       const bg = n<=1?'#FFCDD2':n<=3?'#FFF9C4':'#C8E6C9';
