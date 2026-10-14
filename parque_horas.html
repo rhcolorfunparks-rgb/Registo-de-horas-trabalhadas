@@ -457,7 +457,10 @@
     </div>
     </div><!-- fim gestorSecaoPonto -->
     <div id="gestorSecaoDisp" style="display:none;">
-      <div id="tabelaPontosDisp" style="margin-bottom:1.5rem;"></div>
+      <div style="margin-bottom:1rem;">
+        <button id="btnTabelaPontos" onclick="toggleTabelaPontos()" style="font-size:13px;padding:8px 14px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:'DM Sans',sans-serif;width:100%;text-align:left;">🏅 Ver classificação por pontos (4 semanas)</button>
+        <div id="tabelaPontosDisp" style="display:none;margin-top:8px;"></div>
+      </div>
       <div id="conteudoTabDisp"></div>
     </div>
   </div>
@@ -2547,6 +2550,22 @@ async function encerrarFormularioMonitor() {
   }
 }
 
+let tabelaPontosLoaded = false;
+function toggleTabelaPontos() {
+  const div = document.getElementById('tabelaPontosDisp');
+  const btn = document.getElementById('btnTabelaPontos');
+  if (!div) return;
+  const isOpen = div.style.display !== 'none';
+  if (isOpen) {
+    div.style.display = 'none';
+    btn.textContent = '🏅 Ver classificação por pontos (4 semanas)';
+  } else {
+    div.style.display = 'block';
+    btn.textContent = '🏅 Fechar classificação por pontos';
+    if (!tabelaPontosLoaded) { tabelaPontosLoaded = true; carregarTabelaPontos(); }
+  }
+}
+
 async function carregarTabelaPontos() {
   const el = document.getElementById('tabelaPontosDisp');
   if (!el) return;
@@ -2594,8 +2613,8 @@ async function carregarTabelaPontos() {
         <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-weight:700;">Total</th>
       </tr></thead><tbody>`;
     Object.entries(dispPorMonitor).sort((a,b)=>{
-      const pa=a[1].sab_m.size*0.5+a[1].sab_t.size*1.5+a[1].dom_m.size*1+a[1].dom_t.size*2;
-      const pb=b[1].sab_m.size*0.5+b[1].sab_t.size*1.5+b[1].dom_m.size*1+b[1].dom_t.size*2;
+      const pa=a[1].sab_m.size*0.5+a[1].sab_t.size*1+a[1].dom_m.size*1+a[1].dom_t.size*2.5;
+      const pb=b[1].sab_m.size*0.5+b[1].sab_t.size*1+b[1].dom_m.size*1+b[1].dom_t.size*2.5;
       return pb-pa;
     }).forEach(([nome, c]) => {
       const sm=c.sab_m.size, st=c.sab_t.size, dm=c.dom_m.size, dt=c.dom_t.size;
@@ -2625,7 +2644,7 @@ function abrirSecaoGestor(secao) {
     semanaOffset = 0;
     filtroDispDia = 'todos'; filtroDispPer = 'todos'; filtroDispParque = 'todos';
     horarioAlocado = {};
-    if (gestorTipo === 'monitores') carregarTabelaPontos();
+    // tabela de pontos carrega só quando o utilizador abre
     ['fPerManha','fPerTarde','fPerDiaInteiro'].forEach(id=>{ const el=document.getElementById(id); if(el) el.checked=false; });
     const el = document.getElementById('conteudoTabDisp');
     if (el) { el.innerHTML = ''; renderDisponibilidades(el); }
@@ -2639,6 +2658,11 @@ function voltarGestorHome() {
   document.getElementById('gestorNavBack').style.display = 'none';
   document.getElementById('gestorSecaoPonto').style.display = 'none';
   document.getElementById('gestorSecaoDisp').style.display = 'none';
+  tabelaPontosLoaded = false;
+  const btn = document.getElementById('btnTabelaPontos');
+  if (btn) btn.textContent = '🏅 Ver classificação por pontos (4 semanas)';
+  const div = document.getElementById('tabelaPontosDisp');
+  if (div) div.style.display = 'none';
 }
 
 function gerarPinUnico() {
