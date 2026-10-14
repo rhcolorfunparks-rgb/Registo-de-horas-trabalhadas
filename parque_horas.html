@@ -1400,28 +1400,6 @@ async function renderMonitores(el) {
           </tr>`;
         });
         tbl += '</tbody></table>';
-        // Tabela de leitura rápida (ordenada alfabeticamente, sem coluna de pontos)
-        tbl += `<p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Leitura rápida por slot</p>
-        <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">🔴 = 0–1 semanas · 🟡 = 2–3 semanas · 🟢 = 4 semanas</p>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;">
-          <thead><tr>
-            <th style="padding:6px 8px;border:1px solid var(--border);text-align:left;background:var(--surface);">Monitor</th>
-            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb manhã</th>
-            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb tarde</th>
-            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom manhã</th>
-            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom tarde</th>
-          </tr></thead><tbody>`;
-        Object.entries(dispPorMonitor).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([nome, c]) => {
-          const sm=c.sab_m.size, st=c.sab_t.size, dm=c.dom_m.size, dt=c.dom_t.size;
-          tbl += `<tr>
-            <td style="padding:6px 8px;border:1px solid var(--border);font-size:12px;">${nome}</td>
-            <td style="${cellStyle(sm)}">${sm}</td>
-            <td style="${cellStyle(st)}">${st}</td>
-            <td style="${cellStyle(dm)}">${dm}</td>
-            <td style="${cellStyle(dt)}">${dt}</td>
-          </tr>`;
-        });
-        tbl += '</tbody></table>';
         dispConteudo.innerHTML = tbl;
       } catch(e) {
         dispConteudo.innerHTML = '<div class="empty">Erro ao carregar disponibilidades.</div>';
