@@ -1416,8 +1416,8 @@ async function carregarMeuHorario() {
     const pontosMax = 20;
 
     let semaforo, cor, msg;
-    if (pontos >= 13.5) { semaforo='🟢'; cor='#C8E6C9'; msg='Boa disponibilidade — obrigado!'; }
-    else if (pontos >= 9.5) { semaforo='🟡'; cor='#FFF9C4'; msg='Disponibilidade média — tenta dar mais disponibilidade.'; }
+    if (pontos >= 15) { semaforo='🟢'; cor='#C8E6C9'; msg='Boa disponibilidade — obrigado!'; }
+    else if (pontos >= 10) { semaforo='🟡'; cor='#FFF9C4'; msg='Disponibilidade média — tenta dar mais disponibilidade.'; }
     else { semaforo='🔴'; cor='#FFCDD2'; msg='Pouca disponibilidade — quando temos muitos recursos, damos prioridade a quem está mais disponível de forma consistente.'; }
 
     const cellS = (n, peso) => {
@@ -1430,7 +1430,7 @@ async function carregarMeuHorario() {
         <div style="font-size:48px;margin-bottom:8px;">${semaforo}</div>
         <div style="font-size:18px;font-weight:700;margin-bottom:4px;">${pontos.toFixed(1)} / ${pontosMax} pontos</div>
         <div style="font-size:13px;color:var(--text);margin-bottom:4px;">${msg}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 &lt;9.5 · 🟡 9.5–13.4 · 🟢 ≥13.5 pts (últimas 4 semanas) · Slots nunca dados ou dados só 1× são penalizados</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 &lt;10 · 🟡 10–14.9 · 🟢 ≥15 pts (últimas 4 semanas) · Slots nunca dados são penalizados</div>
       </div>
       <p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Detalhe por slot (últimas 4 semanas)</p>
       <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:0.5rem;">
@@ -2469,8 +2469,8 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
     const pontosBaseGestor = counts.sab_m*0.5 + counts.sab_t*1.5 + counts.dom_m*1 + counts.dom_t*2;
     const penGestor = [counts.sab_m,counts.sab_t,counts.dom_m,counts.dom_t].reduce((acc,v,i)=>acc+(v===0?2*pesosG[i]:0),0);
     const pontosPerfilGestor = pontosBaseGestor - penGestor;
-    const semGestor = pontosPerfilGestor>=13.5?'🟢':pontosPerfilGestor>=9.5?'🟡':'🔴';
-    const corGestor = pontosPerfilGestor>=13.5?'#C8E6C9':pontosPerfilGestor>=9.5?'#FFF9C4':'#FFCDD2';
+    const semGestor = pontosPerfilGestor>=15?'🟢':pontosPerfilGestor>=10?'🟡':'🔴';
+    const corGestor = pontosPerfilGestor>=15?'#C8E6C9':pontosPerfilGestor>=10?'#FFF9C4':'#FFCDD2';
     html += `<p style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;padding-top:1rem;border-top:1px solid var(--border);">Disponibilidade dada — últimas 4 semanas</p>`;
     if (!totalDisps && !disps4.length) {
       html += '<div class="empty" style="margin-bottom:1rem;">Sem disponibilidades registadas nas últimas 4 semanas.</div>';
@@ -2482,7 +2482,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       html += `<div style="background:${corGestor};border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:10px;">
         <span style="font-size:24px;">${semGestor}</span>
         <span style="font-size:15px;font-weight:700;">${pontosPerfilGestor.toFixed(1)} / 20 pontos</span>
-        <span style="font-size:11px;color:var(--muted);">🔴 &lt;9.5 · 🟡 9.5–13.5 · 🟢 ≥13.5</span>
+        <span style="font-size:11px;color:var(--muted);">🔴 &lt;10 · 🟡 10–14.9 · 🟢 ≥15</span>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1.5rem;">
         <thead><tr>
@@ -2605,11 +2605,11 @@ async function carregarTabelaPontos() {
       return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:600;${bg}`;
     };
     const ptStyle = (p) => {
-      const bg = p<9.5?'background:#FFCDD2;':p<13.5?'background:#FFF9C4;':'background:#C8E6C9;';
+      const bg = p<10?'background:#FFCDD2;':p<15?'background:#FFF9C4;':'background:#C8E6C9;';
       return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:700;${bg}`;
     };
     let tbl = `<p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Classificação por pontos</p>
-    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Pontos por slot: Dom tarde=2 · Dom manhã=1 · Sáb tarde=1.5 · Sáb manhã=0.5 &nbsp;|&nbsp; Penalização por slot nunca dado: −2×peso &nbsp;|&nbsp; 🔴 &lt;9.5 · 🟡 9.5–13.5 · 🟢 ≥13.5</p>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Pontos por slot: Dom tarde=2 · Dom manhã=1 · Sáb tarde=1.5 · Sáb manhã=0.5 &nbsp;|&nbsp; Penalização por slot nunca dado: −2×peso &nbsp;|&nbsp; 🔴 🔴 🔴 &lt;9.5 · 🟡 9.5–13.5 · 🟢 ≥13.5lt;10 · 🟡 10–14.9 · 🟢 ≥15lt;10 · 🟡 10–14.9 · 🟢 ≥15</p>
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr>
         <th style="padding:6px 8px;border:1px solid var(--border);text-align:left;background:var(--surface);">Monitor</th>
