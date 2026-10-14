@@ -1408,11 +1408,14 @@ async function carregarMeuHorario() {
     const sm=slotCounts.sab_m.size, st=slotCounts.sab_t.size, dm=slotCounts.dom_m.size, dt=slotCounts.dom_t.size;
     // Pesos por slot (máx 20pts em 4 semanas)
     // Dom tarde=2.5, Dom manhã=1, Sáb tarde=1, Sáb manhã=0.5
-    const pontos = sm*0.5 + st*1 + dm*1 + dt*2.5;
+    // Penalização: slot=0 → -2pts, slot=1 → -1pt
+    const pontosBase = sm*0.5 + st*1 + dm*1 + dt*2.5;
+    const penalizacao = [sm,st,dm,dt].reduce((acc,v)=>acc+(v===0?2:v===1?1:0),0);
+    const pontos = pontosBase - penalizacao;
     const pontosMax = 20;
 
     let semaforo, cor, msg;
-    if (pontos >= 14) { semaforo='🟢'; cor='#C8E6C9'; msg='Boa disponibilidade — obrigado!'; }
+    if (pontos >= 13.5) { semaforo='🟢'; cor='#C8E6C9'; msg='Boa disponibilidade — obrigado!'; }
     else if (pontos >= 9.5) { semaforo='🟡'; cor='#FFF9C4'; msg='Disponibilidade média — tenta dar mais disponibilidade.'; }
     else { semaforo='🔴'; cor='#FFCDD2'; msg='Pouca disponibilidade — quando temos muitos recursos, damos prioridade a quem está mais disponível de forma consistente.'; }
 
@@ -1426,7 +1429,7 @@ async function carregarMeuHorario() {
         <div style="font-size:48px;margin-bottom:8px;">${semaforo}</div>
         <div style="font-size:18px;font-weight:700;margin-bottom:4px;">${pontos.toFixed(1)} / ${pontosMax} pontos</div>
         <div style="font-size:13px;color:var(--text);margin-bottom:4px;">${msg}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 &lt;7 pts · 🟡 7–13 pts · 🟢 ≥14 pts (últimas 4 semanas)</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 &lt;9.5 · 🟡 9.5–13.4 · 🟢 ≥13.5 pts (últimas 4 semanas, com penalização por slots em falta)</div>
       </div>
       <p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Detalhe por slot (últimas 4 semanas)</p>
       <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:0.5rem;">
@@ -2461,9 +2464,11 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       }
     });
     const totalDisps = counts.sab_m + counts.sab_t + counts.dom_m + counts.dom_t;
-    const pontosPerfilGestor = counts.sab_m*0.5 + counts.sab_t*1 + counts.dom_m*1 + counts.dom_t*2.5;
-    const semGestor = pontosPerfilGestor>=14?'🟢':pontosPerfilGestor>=9.5?'🟡':'🔴';
-    const corGestor = pontosPerfilGestor>=14?'#C8E6C9':pontosPerfilGestor>=9.5?'#FFF9C4':'#FFCDD2';
+    const pontosBaseGestor = counts.sab_m*0.5 + counts.sab_t*1 + counts.dom_m*1 + counts.dom_t*2.5;
+    const penGestor = [counts.sab_m,counts.sab_t,counts.dom_m,counts.dom_t].reduce((acc,v)=>acc+(v===0?2:v===1?1:0),0);
+    const pontosPerfilGestor = pontosBaseGestor - penGestor;
+    const semGestor = pontosPerfilGestor>=13.5?'🟢':pontosPerfilGestor>=9.5?'🟡':'🔴';
+    const corGestor = pontosPerfilGestor>=13.5?'#C8E6C9':pontosPerfilGestor>=9.5?'#FFF9C4':'#FFCDD2';
     html += `<p style="font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;padding-top:1rem;border-top:1px solid var(--border);">Disponibilidade dada — últimas 4 semanas</p>`;
     if (!totalDisps && !disps4.length) {
       html += '<div class="empty" style="margin-bottom:1rem;">Sem disponibilidades registadas nas últimas 4 semanas.</div>';
@@ -2475,7 +2480,7 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       html += `<div style="background:${corGestor};border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:10px;">
         <span style="font-size:24px;">${semGestor}</span>
         <span style="font-size:15px;font-weight:700;">${pontosPerfilGestor.toFixed(1)} / 20 pontos</span>
-        <span style="font-size:11px;color:var(--muted);">🔴 &lt;9.5 · 🟡 9.5–13.5 · 🟢 ≥14</span>
+        <span style="font-size:11px;color:var(--muted);">🔴 &lt;9.5 · 🟡 9.5–13.5 · 🟢 ≥13.5</span>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1.5rem;">
         <thead><tr>
@@ -2598,11 +2603,11 @@ async function carregarTabelaPontos() {
       return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:600;${bg}`;
     };
     const ptStyle = (p) => {
-      const bg = p<9.5?'background:#FFCDD2;':p<14?'background:#FFF9C4;':'background:#C8E6C9;';
+      const bg = p<9.5?'background:#FFCDD2;':p<13.5?'background:#FFF9C4;':'background:#C8E6C9;';
       return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:700;${bg}`;
     };
     let tbl = `<p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Classificação por pontos</p>
-    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Dom tarde=2.5 · Dom manhã=1 · Sáb tarde=1 · Sáb manhã=0.5 · Máx 20pts &nbsp;|&nbsp; 🔴 &lt;9.5 · 🟡 9.5–13.5 · 🟢 ≥14</p>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Dom tarde=2.5 · Dom manhã=1 · Sáb tarde=1 · Sáb manhã=0.5 · Penalização: slot=0→−2pts, slot=1→−1pt &nbsp;|&nbsp; 🔴 &lt;9.5 · 🟡 9.5–13.5 · 🟢 ≥13.5</p>
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr>
         <th style="padding:6px 8px;border:1px solid var(--border);text-align:left;background:var(--surface);">Monitor</th>
@@ -2612,13 +2617,15 @@ async function carregarTabelaPontos() {
         <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom tarde<div style="font-weight:400;color:var(--muted);">2.5pts</div></th>
         <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-weight:700;">Total</th>
       </tr></thead><tbody>`;
-    Object.entries(dispPorMonitor).sort((a,b)=>{
-      const pa=a[1].sab_m.size*0.5+a[1].sab_t.size*1+a[1].dom_m.size*1+a[1].dom_t.size*2.5;
-      const pb=b[1].sab_m.size*0.5+b[1].sab_t.size*1+b[1].dom_m.size*1+b[1].dom_t.size*2.5;
-      return pb-pa;
-    }).forEach(([nome, c]) => {
+    const calcPts = (c) => {
       const sm=c.sab_m.size, st=c.sab_t.size, dm=c.dom_m.size, dt=c.dom_t.size;
-      const pts=sm*0.5+st*1+dm*1+dt*2.5;
+      const base=sm*0.5+st*1+dm*1+dt*2.5;
+      const pen=[sm,st,dm,dt].reduce((acc,v)=>acc+(v===0?2:v===1?1:0),0);
+      return base-pen;
+    };
+    Object.entries(dispPorMonitor).sort((a,b)=>calcPts(b[1])-calcPts(a[1])).forEach(([nome, c]) => {
+      const sm=c.sab_m.size, st=c.sab_t.size, dm=c.dom_m.size, dt=c.dom_t.size;
+      const pts=calcPts(c);
       tbl += `<tr>
         <td style="padding:6px 8px;border:1px solid var(--border);font-size:12px;">${nome}</td>
         <td style="${cellStyle(sm)}">${sm}</td>
