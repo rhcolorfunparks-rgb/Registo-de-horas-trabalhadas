@@ -1407,9 +1407,8 @@ async function carregarMeuHorario() {
     });
     const sm=slotCounts.sab_m.size, st=slotCounts.sab_t.size, dm=slotCounts.dom_m.size, dt=slotCounts.dom_t.size;
     // Pesos por slot (máx 20pts em 4 semanas)
-    // Sáb manhã=0.5, Sáb tarde=1.5, Dom manhã=1, Dom tarde=2
-    // Penalização só em zeros, proporcional ao peso: slot=0 → -2×peso
-    // Pesos: sáb manhã=0.75, sáb tarde=1, dom manhã=1.25, dom tarde=2
+    // Sáb manhã=0.75, Sáb tarde=1, Dom manhã=1.25, Dom tarde=2
+    // Referências: 2×2×2×2=10pts (mínimo) | 3×3×3×3=15pts (esperado)
     const pontos = sm*0.75 + st*1 + dm*1.25 + dt*2;
     const pontosMax = 20;
 
@@ -1428,14 +1427,14 @@ async function carregarMeuHorario() {
         <div style="font-size:48px;margin-bottom:8px;">${semaforo}</div>
         <div style="font-size:18px;font-weight:700;margin-bottom:4px;">${pontos.toFixed(1)} / ${pontosMax} pontos</div>
         <div style="font-size:13px;color:var(--text);margin-bottom:4px;">${msg}</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 &lt;10 · 🟡 10–14.9 · 🟢 ≥15 pts (últimas 4 semanas) · Slots nunca dados são penalizados</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px;">🔴 &lt;10 · 🟡 10–14.9 · 🟢 ≥15 pts (últimas 4 semanas)</div>
       </div>
       <p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Detalhe por slot (últimas 4 semanas)</p>
       <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:0.5rem;">
         <thead><tr>
-          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb manhã<div style="font-weight:400;color:var(--muted);">0.5 pts</div></th>
-          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb tarde<div style="font-weight:400;color:var(--muted);">1.5 pts</div></th>
-          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Dom manhã<div style="font-weight:400;color:var(--muted);">1 pt</div></th>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb manhã<div style="font-weight:400;color:var(--muted);">0.75pts</div></th>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Sáb tarde<div style="font-weight:400;color:var(--muted);">1pt</div></th>
+          <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Dom manhã<div style="font-weight:400;color:var(--muted);">1.25pts</div></th>
           <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:11px;">Dom tarde<div style="font-weight:400;color:var(--muted);">2pts</div></th>
         </tr></thead>
         <tbody><tr>
@@ -2481,9 +2480,9 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:1.5rem;">
         <thead><tr>
-          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Sáb manhã<div style="font-weight:400;font-size:10px;color:var(--muted);">0.5 pts</div></th>
+          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Sáb manhã<div style="font-weight:400;font-size:10px;color:var(--muted);">0.75pts</div></th>
           <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Sáb tarde<div style="font-weight:400;font-size:10px;color:var(--muted);">1 pt</div></th>
-          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Dom manhã<div style="font-weight:400;font-size:10px;color:var(--muted);">1 pt</div></th>
+          <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Dom manhã<div style="font-weight:400;font-size:10px;color:var(--muted);">1.25pts</div></th>
           <th style="padding:8px;border:1px solid var(--border);text-align:center;background:var(--surface);font-size:12px;">Dom tarde<div style="font-weight:400;font-size:10px;color:var(--muted);">2pts</div></th>
         </tr></thead>
         <tbody><tr>
@@ -2604,13 +2603,13 @@ async function carregarTabelaPontos() {
       return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:700;${bg}`;
     };
     let tbl = `<p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Classificação por pontos</p>
-    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Pontos por slot: Dom tarde=2 · Dom manhã=1 · Sáb tarde=1.5 · Sáb manhã=0.5 &nbsp;|&nbsp; Penalização por slot nunca dado: −2×peso &nbsp;|&nbsp; 🔴 &lt;10 · 🟡 10–14.9 · 🟢 ≥15</p>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Pontos por slot: Sáb manhã=0.75 · Sáb tarde=1 · Dom manhã=1.25 · Dom tarde=2 &nbsp;|&nbsp; 🔴 &lt;10 · 🟡 10–14.9 · 🟢 ≥15</p>
     <table style="width:100%;border-collapse:collapse;font-size:12px;">
       <thead><tr>
         <th style="padding:6px 8px;border:1px solid var(--border);text-align:left;background:var(--surface);">Monitor</th>
-        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb manhã<div style="font-weight:400;color:var(--muted);">0.5pts</div></th>
-        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb tarde<div style="font-weight:400;color:var(--muted);">1.5pts</div></th>
-        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom manhã<div style="font-weight:400;color:var(--muted);">1pt</div></th>
+        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb manhã<div style="font-weight:400;color:var(--muted);">0.75pts</div></th>
+        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb tarde<div style="font-weight:400;color:var(--muted);">1pt</div></th>
+        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom manhã<div style="font-weight:400;color:var(--muted);">1.25pts</div></th>
         <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom tarde<div style="font-weight:400;color:var(--muted);">2pts</div></th>
         <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-weight:700;">Total</th>
       </tr></thead><tbody>`;
