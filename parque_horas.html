@@ -457,6 +457,7 @@
     </div>
     </div><!-- fim gestorSecaoPonto -->
     <div id="gestorSecaoDisp" style="display:none;">
+      <div id="tabelaPontosDisp" style="margin-bottom:1.5rem;"></div>
       <div id="conteudoTabDisp"></div>
     </div>
   </div>
@@ -1315,100 +1316,9 @@ async function renderMonitores(el) {
   const em=document.createElement('div'); em.id='gErro'; em.className='msg erro'; el.appendChild(em);
   if (!monitoresCache.length) { el.innerHTML+='<div class="empty">Sem monitores. Adicione o primeiro acima.</div>'; return; }
 
-  // Resumo disponibilidade para monitores
   if (gestorTipo === 'monitores') {
-    // ---- Resumo disponibilidade últimas 4 semanas ----
-    const dispDiv = document.createElement('div');
-    dispDiv.style.cssText = 'margin-bottom:1.5rem;';
-    const btnDisp = document.createElement('button');
-    btnDisp.textContent = '📅 Ver resumo de disponibilidade (4 semanas)';
-    btnDisp.style.cssText = 'font-size:13px;padding:8px 14px;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:"DM Sans",sans-serif;margin-bottom:8px;width:100%;text-align:left;';
-    const dispConteudo = document.createElement('div');
-    dispConteudo.style.display = 'none';
-    let dispLoaded = false;
-    btnDisp.onclick = async () => {
-      const isOpen = dispConteudo.style.display !== 'none';
-      if (isOpen) {
-        dispConteudo.style.display = 'none';
-        btnDisp.textContent = '📅 Ver resumo de disponibilidade (4 semanas)';
-        return;
-      }
-      dispConteudo.style.display = 'block';
-      btnDisp.textContent = '📅 Fechar resumo de disponibilidade';
-      if (dispLoaded) return;
-      dispLoaded = true;
-      dispConteudo.innerHTML = '<div class="loading" style="font-size:13px;padding:8px;">A carregar...</div>';
-      try {
-        const agora = new Date();
-        const dataFim = dateToISO(agora);
-        const dataInicioDate = new Date(agora); dataInicioDate.setDate(agora.getDate()-28);
-        const dataInicio = dateToISO(dataInicioDate);
-        const allDisps = await db(`disponibilidades?dia=gte.${dataInicio}&dia=lte.${dataFim}`) || [];
-        // Build counts per monitor
-        const monitoresExt = monitoresCache.filter(m => !m.equipa || m.equipa === 'monitores');
-        const dispPorMonitor = {};
-        monitoresExt.forEach(m => { dispPorMonitor[m.nome] = {sab_m:new Set(), sab_t:new Set(), dom_m:new Set(), dom_t:new Set()}; });
-        allDisps.forEach(d => {
-          const dow = new Date(d.dia+'T12:00:00').getDay();
-          const sem = d.semana_inicio || d.dia;
-          const per = d.periodo;
-          const nome = d.monitor_nome;
-          if (!dispPorMonitor[nome]) return;
-          if (dow === 6) {
-            if (per==='manha'||per==='dia_inteiro') dispPorMonitor[nome].sab_m.add(sem);
-            if (per==='tarde'||per==='dia_inteiro') dispPorMonitor[nome].sab_t.add(sem);
-          } else if (dow === 0) {
-            if (per==='manha'||per==='dia_inteiro') dispPorMonitor[nome].dom_m.add(sem);
-            if (per==='tarde'||per==='dia_inteiro') dispPorMonitor[nome].dom_t.add(sem);
-          }
-        });
-        const cellStyle = (n) => {
-          const bg = n<=1?'background:#FFCDD2;':n<=3?'background:#FFF9C4;':'background:#C8E6C9;';
-          return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:600;${bg}`;
-        };
-        const ptStyle = (p) => {
-          const bg = p<7?'background:#FFCDD2;':p<14?'background:#FFF9C4;':'background:#C8E6C9;';
-          return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:700;${bg}`;
-        };
-        // Tabela de pontos (ordenada por total desc)
-        let tbl = `<p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Classificação por pontos</p>
-        <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Dom tarde=2 · Sáb tarde=1.5 · Dom manhã=1 · Sáb manhã=0.5 · Máx 20pts &nbsp;|&nbsp; 🔴 &lt;7 · 🟡 7–13 · 🟢 ≥14</p>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:1.5rem;">
-          <thead><tr>
-            <th style="padding:6px 8px;border:1px solid var(--border);text-align:left;background:var(--surface);">Monitor</th>
-            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb manhã<div style="font-weight:400;color:var(--muted);">0.5pts</div></th>
-            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb tarde<div style="font-weight:400;color:var(--muted);">1.5pts</div></th>
-            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom manhã<div style="font-weight:400;color:var(--muted);">1pt</div></th>
-            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom tarde<div style="font-weight:400;color:var(--muted);">2pts</div></th>
-            <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-weight:700;">Total</th>
-          </tr></thead><tbody>`;
-        const entradasOrdenadas = Object.entries(dispPorMonitor).sort((a,b)=>{
-          const pa=a[1].sab_m.size*0.5+a[1].sab_t.size*1.5+a[1].dom_m.size*1+a[1].dom_t.size*2;
-          const pb=b[1].sab_m.size*0.5+b[1].sab_t.size*1.5+b[1].dom_m.size*1+b[1].dom_t.size*2;
-          return pb-pa;
-        });
-        entradasOrdenadas.forEach(([nome, c]) => {
-          const sm=c.sab_m.size, st=c.sab_t.size, dm=c.dom_m.size, dt=c.dom_t.size;
-          const pts=sm*0.5+st*1.5+dm*1+dt*2;
-          tbl += `<tr>
-            <td style="padding:6px 8px;border:1px solid var(--border);font-size:12px;">${nome}</td>
-            <td style="${cellStyle(sm)}">${sm}</td>
-            <td style="${cellStyle(st)}">${st}</td>
-            <td style="${cellStyle(dm)}">${dm}</td>
-            <td style="${cellStyle(dt)}">${dt}</td>
-            <td style="${ptStyle(pts)}">${pts.toFixed(1)}</td>
-          </tr>`;
-        });
-        tbl += '</tbody></table>';
-        dispConteudo.innerHTML = tbl;
-      } catch(e) {
-        dispConteudo.innerHTML = '<div class="empty">Erro ao carregar disponibilidades.</div>';
-      }
-    };
-    dispDiv.appendChild(btnDisp); dispDiv.appendChild(dispConteudo); el.appendChild(dispDiv);
-
     const divider = document.createElement('p');
-    divider.style.cssText = 'font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;padding-top:1rem;border-top:1px solid var(--border);';
+    divider.style.cssText = 'font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;padding-top:0.5rem;';
     divider.textContent = 'Lista de monitores';
     el.appendChild(divider);
   }
@@ -2637,6 +2547,75 @@ async function encerrarFormularioMonitor() {
   }
 }
 
+async function carregarTabelaPontos() {
+  const el = document.getElementById('tabelaPontosDisp');
+  if (!el) return;
+  el.innerHTML = '<div class="loading" style="font-size:13px;padding:8px;">A carregar...</div>';
+  try {
+    const agora = new Date();
+    const dataFim = dateToISO(agora);
+    const dataInicioDate = new Date(agora); dataInicioDate.setDate(agora.getDate()-28);
+    const dataInicio = dateToISO(dataInicioDate);
+    const allDisps = await db(`disponibilidades?dia=gte.${dataInicio}&dia=lte.${dataFim}`) || [];
+    const monitoresExt = monitoresCache.filter(m => !m.equipa || m.equipa === 'monitores');
+    const dispPorMonitor = {};
+    monitoresExt.forEach(m => { dispPorMonitor[m.nome] = {sab_m:new Set(), sab_t:new Set(), dom_m:new Set(), dom_t:new Set()}; });
+    allDisps.forEach(d => {
+      const dow = new Date(d.dia+'T12:00:00').getDay();
+      const sem = d.semana_inicio || d.dia;
+      const per = d.periodo;
+      const nome = d.monitor_nome;
+      if (!dispPorMonitor[nome]) return;
+      if (dow === 6) {
+        if (per==='manha'||per==='dia_inteiro') dispPorMonitor[nome].sab_m.add(sem);
+        if (per==='tarde'||per==='dia_inteiro') dispPorMonitor[nome].sab_t.add(sem);
+      } else if (dow === 0) {
+        if (per==='manha'||per==='dia_inteiro') dispPorMonitor[nome].dom_m.add(sem);
+        if (per==='tarde'||per==='dia_inteiro') dispPorMonitor[nome].dom_t.add(sem);
+      }
+    });
+    const cellStyle = (n) => {
+      const bg = n<=1?'background:#FFCDD2;':n<=3?'background:#FFF9C4;':'background:#C8E6C9;';
+      return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:600;${bg}`;
+    };
+    const ptStyle = (p) => {
+      const bg = p<7?'background:#FFCDD2;':p<14?'background:#FFF9C4;':'background:#C8E6C9;';
+      return `padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:13px;font-weight:700;${bg}`;
+    };
+    let tbl = `<p style="font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;">Classificação por pontos</p>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;">Dom tarde=2 · Sáb tarde=1.5 · Dom manhã=1 · Sáb manhã=0.5 · Máx 20pts &nbsp;|&nbsp; 🔴 &lt;7 · 🟡 7–13 · 🟢 ≥14</p>
+    <table style="width:100%;border-collapse:collapse;font-size:12px;">
+      <thead><tr>
+        <th style="padding:6px 8px;border:1px solid var(--border);text-align:left;background:var(--surface);">Monitor</th>
+        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb manhã<div style="font-weight:400;color:var(--muted);">0.5pts</div></th>
+        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Sáb tarde<div style="font-weight:400;color:var(--muted);">1.5pts</div></th>
+        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom manhã<div style="font-weight:400;color:var(--muted);">1pt</div></th>
+        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom tarde<div style="font-weight:400;color:var(--muted);">2pts</div></th>
+        <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-weight:700;">Total</th>
+      </tr></thead><tbody>`;
+    Object.entries(dispPorMonitor).sort((a,b)=>{
+      const pa=a[1].sab_m.size*0.5+a[1].sab_t.size*1.5+a[1].dom_m.size*1+a[1].dom_t.size*2;
+      const pb=b[1].sab_m.size*0.5+b[1].sab_t.size*1.5+b[1].dom_m.size*1+b[1].dom_t.size*2;
+      return pb-pa;
+    }).forEach(([nome, c]) => {
+      const sm=c.sab_m.size, st=c.sab_t.size, dm=c.dom_m.size, dt=c.dom_t.size;
+      const pts=sm*0.5+st*1.5+dm*1+dt*2;
+      tbl += `<tr>
+        <td style="padding:6px 8px;border:1px solid var(--border);font-size:12px;">${nome}</td>
+        <td style="${cellStyle(sm)}">${sm}</td>
+        <td style="${cellStyle(st)}">${st}</td>
+        <td style="${cellStyle(dm)}">${dm}</td>
+        <td style="${cellStyle(dt)}">${dt}</td>
+        <td style="${ptStyle(pts)}">${pts.toFixed(1)}</td>
+      </tr>`;
+    });
+    tbl += '</tbody></table>';
+    el.innerHTML = tbl;
+  } catch(e) {
+    el.innerHTML = '<div class="empty">Erro ao carregar disponibilidades.</div>';
+  }
+}
+
 function abrirSecaoGestor(secao) {
   document.getElementById('gestorHome').style.display = 'none';
   document.getElementById('gestorNavBack').style.display = 'block';
@@ -2646,6 +2625,7 @@ function abrirSecaoGestor(secao) {
     semanaOffset = 0;
     filtroDispDia = 'todos'; filtroDispPer = 'todos'; filtroDispParque = 'todos';
     horarioAlocado = {};
+    if (gestorTipo === 'monitores') carregarTabelaPontos();
     ['fPerManha','fPerTarde','fPerDiaInteiro'].forEach(id=>{ const el=document.getElementById(id); if(el) el.checked=false; });
     const el = document.getElementById('conteudoTabDisp');
     if (el) { el.innerHTML = ''; renderDisponibilidades(el); }
