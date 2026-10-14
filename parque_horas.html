@@ -1178,18 +1178,6 @@ async function renderTab() {
 }
 async function mudarEstado(id, estado) {
   try {
-    if (estado === 'aprovado') {
-      // Check for existing approved record for same monitor/date
-      const registo = registosCache.find(r => r.id === id);
-      if (registo) {
-        const duplicados = await db(`registos?monitor_id=eq.${registo.monitor_id}&data=eq.${registo.data}&estado=eq.aprovado&id=neq.${id}`) || [];
-        if (duplicados.length > 0) {
-          const dup = duplicados[0];
-          const confirmar = confirm(`⚠️ Duplicado detetado!\n\n${registo.monitor_nome} já tem um registo APROVADO para ${fmtData(registo.data)}:\n${dup.entrada} → ${dup.saida}\n\nTem a certeza que quer aprovar este registo (${registo.entrada} → ${registo.saida})?`);
-          if (!confirmar) return;
-        }
-      }
-    }
     await db(`registos?id=eq.${id}`,{method:'PATCH',body:{estado},prefer:'return=minimal',headers:{}});
     await carregarGestor();
   } catch(e){}
