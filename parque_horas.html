@@ -1410,7 +1410,9 @@ async function carregarMeuHorario() {
     // Dom tarde=2.5, Dom manhã=1, Sáb tarde=1, Sáb manhã=0.5
     // Penalização: slot=0 → -2pts, slot=1 → -1pt
     const pontosBase = sm*0.5 + st*1 + dm*1 + dt*2.5;
-    const penalizacao = [sm,st,dm,dt].reduce((acc,v)=>acc+(v===0?2:v===1?1:0),0);
+    // Penalização proporcional ao peso do slot: slot=0 → -2×peso, slot=1 → -1×peso
+    const pesos = [0.5, 1, 1, 2.5];
+    const penalizacao = [sm,st,dm,dt].reduce((acc,v,i)=>acc+(v===0?2:v===1?1:0)*pesos[i],0);
     const pontos = pontosBase - penalizacao;
     const pontosMax = 20;
 
@@ -2465,7 +2467,8 @@ async function abrirPerfilColaborador(monitorId, nomeMonitor) {
     });
     const totalDisps = counts.sab_m + counts.sab_t + counts.dom_m + counts.dom_t;
     const pontosBaseGestor = counts.sab_m*0.5 + counts.sab_t*1 + counts.dom_m*1 + counts.dom_t*2.5;
-    const penGestor = [counts.sab_m,counts.sab_t,counts.dom_m,counts.dom_t].reduce((acc,v)=>acc+(v===0?2:v===1?1:0),0);
+    const pesosG = [0.5, 1, 1, 2.5];
+    const penGestor = [counts.sab_m,counts.sab_t,counts.dom_m,counts.dom_t].reduce((acc,v,i)=>acc+(v===0?2:v===1?1:0)*pesosG[i],0);
     const pontosPerfilGestor = pontosBaseGestor - penGestor;
     const semGestor = pontosPerfilGestor>=13.5?'🟢':pontosPerfilGestor>=9.5?'🟡':'🔴';
     const corGestor = pontosPerfilGestor>=13.5?'#C8E6C9':pontosPerfilGestor>=9.5?'#FFF9C4':'#FFCDD2';
@@ -2617,10 +2620,11 @@ async function carregarTabelaPontos() {
         <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);">Dom tarde<div style="font-weight:400;color:var(--muted);">2.5pts</div></th>
         <th style="padding:6px 4px;border:1px solid var(--border);text-align:center;background:var(--surface);font-weight:700;">Total</th>
       </tr></thead><tbody>`;
+    const pesosTab = [0.5, 1, 1, 2.5];
     const calcPts = (c) => {
       const sm=c.sab_m.size, st=c.sab_t.size, dm=c.dom_m.size, dt=c.dom_t.size;
       const base=sm*0.5+st*1+dm*1+dt*2.5;
-      const pen=[sm,st,dm,dt].reduce((acc,v)=>acc+(v===0?2:v===1?1:0),0);
+      const pen=[sm,st,dm,dt].reduce((acc,v,i)=>acc+(v===0?2:v===1?1:0)*pesosTab[i],0);
       return base-pen;
     };
     Object.entries(dispPorMonitor).sort((a,b)=>calcPts(b[1])-calcPts(a[1])).forEach(([nome, c]) => {
